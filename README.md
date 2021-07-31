@@ -8,7 +8,7 @@
 + ...
 
 ### 体验二维码
-![二维码](https://gitee.com/geeksite/dangdang/blob/master/screenshots/qrcode.png)
+![二维码](https://yzimg.jikebang.com/daguanjia/screenshots/qrcode.png)
 
 ### 功能
 + 会议室预约
@@ -35,7 +35,7 @@ npm run build
 ```
 
 ### 相关截图
-![首页](https://gitee.com/geeksite/dangdang/blob/master/screenshots/01.png)
+![首页](https://yzimg.jikebang.com/daguanjia/screenshots/01.png)
 
 ### 更新日志
 [Change Log](CHANGELOG.md)
@@ -49,7 +49,7 @@ https://github.com/TalkingData/iview-weapp
 ### 打赏
 如果你喜欢我的作品，可以请我喝杯咖啡支持下，谢谢你。
 
-![](https://gitee.com/geeksite/dangdang/blog/master/screenshots/my_qrcode.jpg)
+![](https://yzimg.jikebang.com/daguanjia/screenshots/my_qrcode.jpg)
 
 ### License
 DangDang is licensed under [The MIT License](LICENSE)
