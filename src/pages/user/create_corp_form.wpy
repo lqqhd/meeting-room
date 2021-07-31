@@ -1,0 +1,146 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <view style="padding: 40rpx 0;text-align: center;font-size: 42rpx;">
+        创建组织
+      </view>
+      <input hidden name="id" value="{{ entry.id }}" />
+      <i-input id="name" value="{{ entry.name }}" title="组织名称" placeholder="填写组织名称" maxlength="100" bind:change="bindChange" errorMessage="{{errMsgs.nameErrMsg}}" />
+      <view class="btn-box">
+        <view class="biz-btn save" @tap="submit">创建</view>
+      </view>
+      <view style="display:flex;justify-content:space-between;padding: 20rpx 0 50rpx 0;">
+        <button type="primary" @tap="toHome()" style="margin: 0 10rpx 0 34rpx;width: 50%;font-size: 28rpx;height: 78rpx;line-height: 78rpx;background:#aaa"><view style="display:flex;justify-content: center;">
+            <text>去主页</text></view>
+          </button>
+        <button type="primary" @tap="toOld()" style="margin: 0 34rpx 0 10rpx;width: 50%;font-size: 28rpx;height: 78rpx;line-height: 78rpx;background:#aaa"><view style="display:flex;justify-content: center;">
+            <text>加入已有组织</text></view>
+          </button>
+      </view>
+      <i-message id="message"></i-message>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import util from '@/utils/util.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class BindUserForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '创建组织',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index",
+        "i-steps": "../../public/iview/steps/index",
+        "i-step": "../../public/iview/step/index"
+      }
+    }
+    data = {
+      entry: {
+        op: 1
+      },
+      checkRules: {
+        required: [
+          "name"
+        ]
+      },
+      errMsgs: {}
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      toOld(e) {
+        wepy.navigateTo({
+          url: '/pages/user/join_corp_form'
+        })
+      },
+      toHome(e) {
+        wepy.switchTab({
+          url: '/pages/index'
+        })
+      },
+      async submit() {
+        //检查必填
+        let checked = true
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        let bean = {}
+        for (let key in this.entry) {
+          bean[key] = this.entry[key]
+        }
+        let url = 'sys/addCompany'
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          Session.set('refresh', true)
+          Session.set('refresh_office', true)
+          //通知Tab页面需要刷新
+          for (let index = 0; index < 5; index++) {
+            Session.set('page-' + index, true)
+          }
+          tip.confirm(data.message, {}, '组织创建成功', false).then(function(value) {
+            wepy.switchTab({
+              url: '/pages/index'
+            })
+          }, function(error) {});
+        } else {
+          this.errMsgs.nameErrMsg = data.message
+        }
+        this.$apply()
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if (options.id == undefined) {} else {}
+    }
+  }
+</script>
+
+<style>
+  .btn {
+    color: red;
+    width: 150rpx;
+    height: 70rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid red;
+    background: #fff;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+  }
+</style>
+
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

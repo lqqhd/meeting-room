@@ -1,0 +1,48 @@
+<template>
+  <view class="container">
+    <view style="padding: 80rpx 0;text-align: center;font-size: 42rpx;">      
+    </view>
+    <view style="padding:10rpx 30rpx 100rpx 30rpx;font-size: 30rpx;text-align: center;">
+      <text class="invite-title">如需正式使用，请您联系客服处理，谢谢！</text>
+    </view>    
+    <view style="padding:100rpx 0 0 0">
+      <button type="primary" open-type="contact"  style="width: 92%;font-size: 28rpx;height: 86rpx;line-height: 86rpx;"><view style="display:flex;justify-content: center;">
+                  <text>联系客服</text></view>
+                </button>
+    </view>    
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  import util from '@/utils/util.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class JoinCorpForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '联系客服',
+      usingComponents: {
+      }
+    }    
+    computed = {}
+    onLoad() {
+    }
+    
+  }
+</script>
+
+<style>
+  .invite-title {
+    color: #f50;
+    font-weight: 700;
+    font-size: 28rpx;    
+  }
+</style>
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

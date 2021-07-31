@@ -1,0 +1,69 @@
+<template>
+  <view class="container">
+    <view style="padding: 40rpx 0;text-align: center;font-size: 42rpx;">
+    </view>
+    <view>
+      <i-input id="name" value="{{ entry.name }}" title="姓名" placeholder="请输入姓名" maxlength="20" bind:change="bindChange" right errorMessage="{{errMsgs.mobileErrMsg}}" />
+    </view>
+    <view style="padding:100rpx 0 0 0">
+      <button type="primary" @tap="submit" style="width: 92%;font-size: 28rpx;height: 86rpx;line-height: 86rpx;"><view style="display:flex;justify-content: center;">
+          <text>保存</text></view>
+        </button>
+    </view>
+    <i-message id="message"></i-message>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  export default class nameEdit extends wepy.page {
+    config = {
+      navigationBarTitleText: '姓名设置',
+      "usingComponents": {
+        "i-cell": "../../public/iview/cell/index",
+        "i-button": "../../public/iview/button/index",
+        "i-input": "../../public/iview/input/index",
+      }
+    }
+    data = {
+      entry: {
+        name: ''
+      }
+    }
+    onLoad() {
+      this.getUser()
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      async submit(e) {
+        const name = this.entry.name
+        if (name === '') {
+          tip.error('姓名不能为空！')
+          return false
+        }
+        let data = await wxRequest.Get('user/update_user_info', {
+          name: name
+        })
+        if (data != undefined && data.code >= 1) {
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    async getUser() {
+      const data = await wxRequest.Get('getUserInfo')
+      this.entry.name = data.result.user.name
+      this.$apply()
+    }
+  }
+</script>
+<style>
+
+</style>

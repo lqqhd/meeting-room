@@ -1,0 +1,23 @@
+<template>
+  <view class="container">
+    <web-view src="https://daguanjia.jikebang.com/app/oa-license.htm" bindmessage=""></web-view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'  
+  export default class MemberAgree extends wepy.page {
+    config = {
+      navigationBarTitleText: '服务协议'
+    }
+    data = {    
+    }
+    onLoad(options) {     
+    }
+    computed = {}
+    methods = {}    
+  }
+</script>
+<style lang="scss" src="@/public/styles/common_form.scss"/>
+
+</style>

@@ -1,0 +1,271 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <input hidden name="boardroomBookId" value="{{ book.boardroomBookId }}" />
+      <view class="item">
+        <view class="item-name">会议室名称</view>
+        <input value="{{ book.roomName }}" disabled="true" />
+      </view>
+      <view class="item" hidden="{{ book.boardroomBookId == 0 }}">
+        <view class="item-name">申请人</view>
+        <input value="{{ book.userName }}" disabled="true" />
+      </view>
+      <view class="item">
+        <view class="item-name">会议主题</view>
+        <input value="{{ book.title }}" bindinput="bindKeyTitle" maxlength="60" placeholder="会议主题（选填）" disabled="{{audit}}" />
+      </view>
+      <view class="item">
+        <view class="item-name">预约日期</view>
+        <input type="number" value="{{ book.bookDate }}" disabled="true" />
+      </view>
+      <view class="item">
+        <view class="item-name">预约开始时间</view>
+        <picker mode="multiSelector" bindchange="bindKeyStartTime" bindcolumnchange="" value="{{startTimeIndex}}" range="{{multiArray}}" disabled="{{audit}}">
+          <view style="display: flex;justify-content: flex-end;">
+            <input value='{{book.startTime}}' placeholder='选择开始时间' disabled="true" />
+            <view class="iconfont icon-time" style="color: #0095F2;font-size:40rpx;;padding-left: 10rpx;"></view>
+          </view>
+        </picker>
+      </view>
+      <view class="item">
+        <view class="item-name">预约结束时间</view>
+        <picker mode="multiSelector" bindchange="bindKeyEndTime" bindcolumnchange="" value="{{endTimeIndex}}" range="{{multiArray}}" disabled="{{audit}}">
+          <view style="display: flex;justify-content: flex-end;">
+            <input value='{{book.endTime}}' placeholder='选择结束时间' disabled="true" />
+            <view class="iconfont icon-time" style="color: #0095F2;font-size:40rpx;padding-left: 10rpx;"></view>
+          </view>
+        </picker>
+      </view>
+      <view class="textarea">
+        <textarea placeholder-class="place-class" bindinput="bindKeyRemark" value="{{ book.remark }}" placeholder="备注" disabled="{{audit}}" />
+      </view>
+      <view class="textarea" hidden="{{book.boardroomBookId == 0}}">
+        <textarea placeholder-class="place-class" bindinput="bindKeyReject" value="{{ book.rejectResion }}" placeholder="驳回原因" disabled="{{!audit}}" />
+      </view>
+    </view>
+    <view class="btn-box">
+      <view class="biz-btn" @tap="del" hidden="{{book.boardroomBookId == 0 || audit}}">取消预约</view>
+      <view class="biz-btn" @tap="reject" hidden="{{!audit}}">驳回</view>
+      <view class="biz-btn save" @tap="agree" hidden="{{!audit}}">审核通过</view>
+      <view class="biz-btn save" @tap="submit" hidden="{{audit}}">{{book.boardroomBookId == 0?"提交预约":"修改预约"}}</view>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import Host from '@/utils/host'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  const hours = ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23'];
+  const minutes = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+  export default class Boardbook extends wepy.page {
+    config = {
+      navigationBarTitleText: '预约会议室'
+    }
+    data = {
+      book: {
+        boardroomBookId: 0,
+        boardroomId: '',
+        roomName: '',
+        title: '',
+        bookDate: '',
+        startTime: '',
+        endTime: '',
+        remark: '',
+        userIds: '',
+        userName: '',
+        rejectResion: ''
+      },
+      multiArray: [hours, minutes],
+      startTimeIndex: [0, 0],
+      endTimeIndex: [0, 0],
+      audit: false,
+      users:[]
+    }
+    methods = {
+      bindKeyTitle(e) {
+        this.book.title = e.detail.value
+      },
+      bindKeyStartTime(e) {
+        let hour = this.data.multiArray[0][e.detail.value[0]]
+        let minute = this.data.multiArray[1][e.detail.value[1]]
+        this.book.startTime = hour + ":" + minute
+      },
+      bindKeyEndTime(e) {
+        let hour = this.data.multiArray[0][e.detail.value[0]]
+        let minute = this.data.multiArray[1][e.detail.value[1]]
+        this.book.endTime = hour + ":" + minute
+      },
+      bindKeyRemark(e) {
+        this.book.remark = e.detail.value
+      },
+      bindKeyReject(e) {
+        this.book.rejectResion = e.detail.value
+      },
+      async del() {
+        await tip.confirm('确认取消此会议室的预约吗！', {}, '警告')
+        const data = await wxRequest.Get(`daguanjia/unsubscribeBoardroom/`, {
+          boardroomBookId: this.book.boardroomBookId
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async submit() {
+        if(Session.get('user_load_cache').isMemberExpiry){
+          await tip.confirm('服务已过期，现只有查看权限，请联系您组织内负责此业务的管理员续费后再进行此操作，谢谢！', {}, '服务过期提示', false)
+          return
+        }
+        let cId = this.book.boardroomBookId
+        let url = 'daguanjia/modifyBoardroomBook'
+        if (this.book.boardroomBookId == 0) {
+          url = 'daguanjia/subscribeBoardroom'
+        }
+        if (this.book.roomName == '') {
+          tip.error('未选择预约地点')
+          return false
+        }
+        let data = await wxRequest.Get(url, {
+          boardroomBookId: this.book.boardroomBookId,
+          startTime: this.book.bookDate + " " + this.book.startTime,
+          endTime: this.book.bookDate + " " + this.book.endTime,
+          remark: this.book.remark,
+          title: this.book.title,
+          boardroomId: this.book.boardroomId
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.success(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async reject() {
+        await tip.confirm('确认驳回此会议室的预约吗！', {}, '警告')
+        const data = await wxRequest.Get(`daguanjia/boardroomReject/`, {
+          boardroomBookId: this.book.boardroomBookId,
+          rejectResion: this.book.rejectResion
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.success(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async agree() {
+        const data = await wxRequest.Get(`daguanjia/boardroomAgree/`, {
+          boardroomBookId: this.book.boardroomBookId
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.success(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    computed = {
+      host() {
+        return Host.host;
+      }
+    }
+    onLoad(options) {
+      if (options.id == undefined) {
+        this.book.bookDate = options.bookDate
+        this.book.boardroomId = options.boardroomId
+        this.book.roomName = options.roomName
+        this.book.startTime = options.time + ":00"
+        this.book.endTime = parseInt(options.time) + 1 + ":00"
+        this.startTimeIndex = [parseInt(options.time), 0]
+        this.endTimeIndex = [parseInt(options.time) + 1, 0]
+      } else {
+        this.audit = options.audit == undefined ? false : true
+        this.getBook(options.id)
+      }
+    }
+    async getUsers(){
+      const data = await wxRequest.Get('daguanjia/listCompPhoneBook', {
+        py: '',
+        pageNo: ''
+      });
+      if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+        if (data.result.items.length == 0) {
+          this.searchNone = true;
+        }
+        this.department = [];
+        this.users = [];
+        let deptId = 0;
+        data.result.items.forEach((user, index) => {
+          if (user.deptId != deptId) {
+            user.deptType=true
+            deptId = user.deptId
+          }
+          if(user.mobile != null && user.mobile != '' && user.mobile != undefined && user.mobile.substring(0,3) == '100'){
+            user.mobile = ''
+          }
+          this.users.push(user)
+        });
+
+        //this.result = [...this.result, ...data.result.items];
+      } else {
+        this.users = [];
+      }
+    }
+    async getBook(id) {
+      const data = await wxRequest.Get('daguanjia/getBoardroomBook', {
+        boardroomBookId: id
+      })
+      if (data != undefined && data.code >= 1) {
+        let book = data.result
+        this.book.boardroomBookId = book.id
+        this.book.boardroomId = book.boardroomId
+        this.book.roomName = book.boardroomName
+        this.book.bookDate = book.startTime.split(' ')[0]
+        this.book.userName = book.deptName + "-" + book.user.name
+        this.book.remark = book.remark
+        this.book.title = book.title
+        this.book.rejectResion = book.rejectResion == undefined?'':book.rejectResion
+        //处理日期回显
+        let startTime = book.startTime.split(' ')[1].substring(0, 5)
+        let endTime = book.endTime.split(' ')[1].substring(0, 5)
+        this.book.startTime = startTime
+        this.book.endTime = endTime
+        this.startTimeIndex = [parseInt(startTime.split(':')[0]), parseInt(startTime.split(':')[1]) / 5]
+        this.endTimeIndex = [parseInt(endTime.split(':')[0]), parseInt(endTime.split(':')[1]) / 5]
+      } else {
+        tip.error(data.message)
+      }
+      this.$apply()
+    }
+  }
+</script>
+<style lang="scss" src="@/public/styles/common_form.scss">
+
+</style>

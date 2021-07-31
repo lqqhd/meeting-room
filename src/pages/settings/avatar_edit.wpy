@@ -1,0 +1,121 @@
+<template>
+  <view>
+    <cropper :options="cropperOpt" @beforeImageLoad="bl"></cropper>
+    <view class="cropper-buttons">
+      <view class="upload" @tap="uploadTap">
+        选择图片
+      </view>
+      <view class="getCropperImage" @tap="getCropperImage">
+        确认
+      </view>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import Cropper from '@/components/wepy-com-cropper'
+  import tip from '@/utils/tip'
+  const device = wx.getSystemInfoSync()
+  const width = device.windowWidth
+  const height = device.windowHeight - 50
+  export default class AvatarEdit extends wepy.page {
+    data = {
+      cropperOpt: {
+        width,
+        height,
+        scale: 2.5,
+        zoom: 8,
+        cut: {
+          x: (width - 300) / 2,
+          y: (height - 300) / 2,
+          width: 300,
+          height: 300
+        }
+      }
+    }
+    components = {
+      cropper: Cropper
+    }
+    events = {
+      ready() {
+        console.log('we-cropper ready')
+      },
+      beforeImageLoad() {
+        console.log('we-cropper beforeImageLoad')
+      },
+      imageLoad() {
+        console.log('we-cropper imageLoad')
+      },
+      beforeDraw() {
+        console.log('we-cropper beforeDraw')
+      }
+    }
+    methods = {
+      uploadTap() {
+        wx.chooseImage({
+          count: 1, // 默认9
+          sizeType: ['original', 'compressed'], // 可以指定是原图还是压缩图，默认二者都有
+          sourceType: ['album', 'camera'], // 可以指定来源是相册还是相机，默认二者都有
+          success: (res) => {
+            const src = res.tempFilePaths[0]
+            //  获取裁剪图片资源后，给data添加src属性及其值
+            this.$invoke('cropper', 'pushOrigin', src)
+          }
+        })
+      },
+      async getCropperImage() {
+        let _this = this
+        this.$invoke('cropper', 'getCropperImage').then((src) => {
+          _this.updateAvatar(src)
+        }).catch(err => {
+          console.log('获取图片地址失败，异常信息：' + err)
+        })
+      }
+    }
+    async updateAvatar(src) {
+      tip.loading("正在设置...")
+      const retObj = await wxRequest.Upload('user/updateUserIcon', src, {})
+      const data = JSON.parse(retObj.data);
+      tip.loaded()
+      if (data != undefined && data.code >= 1) {
+        if (data.message != undefined && data.message != '') {
+          tip.error(data.message)
+        }
+        wepy.navigateBack({
+          delta: 1
+        })
+      } else {
+        tip.loaded()
+        tip.error(data.message)
+      }
+    }
+  }
+</script>
+
+<style lang="less">
+  .cropper-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 200rpx;
+    padding: 0;
+    box-sizing: border-box;
+    line-height: 50px;
+  }
+  .cropper-buttons .upload,
+  .cropper-buttons .getCropperImage {
+    text-align: center;
+    width: 100%;
+    background: #1976D2;
+    border-radius: 10rpx;
+    margin: 0 20rpx;
+    color: white;
+  }
+</style>

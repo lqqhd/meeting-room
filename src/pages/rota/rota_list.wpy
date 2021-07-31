@@ -1,0 +1,310 @@
+<template>
+  <view class="container">
+    <view id="title-view" class="input-box" style="width: 100%;background:#fff;z-index: 999;">
+      <calendar id="calendar" bind:lastMonth="monthChange" bind:nextMonth="monthChange" bind:select="dayClick" onlyShowHeader></calendar>
+      <view class="dept-title" style="display: flex;margin-top: 8rpx;padding:16rpx 0">
+        <view style="width:30%;text-align: center;">日期</view>
+        <view style="width:20%;text-align: center;">带班领导</view>
+        <view style="width:50%;text-align: center;">值班人员</view>
+      </view>
+    </view>
+    <view wx:if="{{ showEmpty }}" style="padding-top: 200rpx;">
+      <empty :title.sync="emptyTitle"></empty>
+    </view>
+    <scroll-view class="time-area" scroll-top='{{day_y}}' style="height:{{sViewHeight}}rpx" scroll-y bindscroll='dataScroll'>
+      <view class="statement-list" wx:if="{{ result.length > 0 }}">
+        <repeat for="{{ result }}" key="k" index="v" item="rota">
+          <view class="statement" style="margin:0;padding: 0;">
+            <view class="information">
+              <view class="st-title" style="{{rota.rotaDate== currentDay?'background:#FF8C69;font-weight:500;':''}}">
+                <view class="title" style="width:30%;text-align: center;">{{ rota.simpleData+'日 星期'+rota.week }}</view>
+                <view class="title" style="width:20%;text-align: center;">
+                  <button wx:for="{{rota.leaders}}" wx:for-item="item" class="btn" wx:key="item.index" bindtap="contactUser('{{ item }}')" data-value="{{item.userId}}" data-index="{{index}}" checked="{{item.selected}}">{{item.userName}}</button>
+                </view>
+                <view class="title btn-much">
+                  <button wx:for="{{rota.dutys}}" wx:for-item="item" class="btn" wx:key="item.index" bindtap="contactUser('{{ item }}')" data-value="{{item.userId}}" data-index="{{index}}" checked="{{item.selected}}">{{item.userName}}</button>
+                </view>
+              </view>
+            </view>
+          </view>
+        </repeat>
+        <i-action-sheet visible="{{ visible1 }}" actions="{{ actions1 }}" show-cancel bind:cancel="handleCancel1" bind:click="handleClickItem1" />
+        <view class="loading-icon" wx:if="{{ bottomLoading }}">
+          <i-spin></i-spin>
+        </view>
+        <i-load-more wx:if="{{ searchNone }}" loading="{{ false }}" />
+      </view>
+    </scroll-view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import wxRequest from '@/utils/wxRequest';
+  import Empty from '@/components/empty';
+  import tip from '@/utils/tip';
+  import utils from '@/utils/date-util';
+  export default class RotaList extends wepy.page {
+    config = {
+      navigationBarTitleText: '值班表',
+      usingComponents: {
+        'i-load-more': '../../public/iview/load-more/index',
+        'i-spin': '../../public/iview/spin/index',
+        'i-action-sheet': '../../public/iview/action-sheet/index',
+        "calendar": "../../components/calendar/calendar"
+      }
+    };
+    data = {
+      emptyTitle: '暂未查询到相关数据',
+      showEmpty: false,
+      scrollTop: 0,
+      keyword: '',
+      result: [],
+      bottomLoading: false,
+      searchNone: false,
+      department: [],
+      deptUsers: {},
+      queryMonth: '',
+      sViewHeight: 1000,
+      day_y: 0,
+      actions1: [{
+          name: '选项1',
+        },
+        {
+          name: '选项2'
+        },
+        {
+          name: '去分享',
+          icon: 'share',
+          openType: 'share'
+        }
+      ],
+      visible1: false,
+      user: '',
+      currentDay: 0,
+      todayIdx: 0
+    };
+    components = {
+      empty: Empty
+    };
+    methods = {
+      statement(key, id) {
+        wepy.navigateTo({
+          url: `/pages/statements/detail?${key}=${id}`
+        })
+      },
+      contactUser(user) {
+        this.user = user
+        this.getUser(user.userId)
+        this.actions1 = [{
+          name: '联系【' + user.userName + "】"
+        }, {
+          name: '拨打手机',
+          icon: 'mobilephone_fill',
+          size: 16
+        }, {
+          name: '拨打座机',
+          icon: 'mobilephone_fill',
+          size: 16
+        }]
+        this.visible1 = true
+      },
+      handleCancel1() {
+        this.visible1 = false
+      },
+      monthChange(e) {
+        this.queryMonth = e.detail
+        this.listRota()
+      },
+      dayClick: function(event) {
+        this.queryMonth = event.detail.substring(0, 7)
+        this.listRota()
+      },
+      //内容区域滑动
+      dataScroll(e) {
+        let moveY = e.detail.scrollTop //获取内容区域纵向滑动距离
+        if (this.day_y != moveY) { //监听srcoll滑动事件，判断下面红色部分与左边的距离和蓝色部分与左边的距离是否相等，相等的话就是纵向滑动，否则就是横向滑动，只有横向滑动的时候才改变蓝色部分滑动的距离
+          this.day_y = moveY //这里需要实时渲染
+        }
+      },
+      handleClickItem1({
+        detail
+      }) {
+        if (detail.index == 1) { //拨打手机
+          if (this.user.mobile != null && this.user.mobile != '' && this.user.mobile != undefined && this.user.mobile.substring(0, 3) == '100') {
+            tip.error("用户的手机号是空，无法拨打！")
+            return
+          }
+          wx.makePhoneCall({
+            phoneNumber: this.user.mobile
+          })
+        } else if (detail.index == 2) { //拨打座机
+          if (this.user.deptPhone != null && this.user.deptPhone != '' && this.user.deptPhone != undefined) {
+            tip.error("用户的座机号是空，无法拨打！")
+            return
+          }
+          wx.makePhoneCall({
+            phoneNumber: this.user.deptPhone
+          })
+        }
+      }
+    };
+    onPageScroll(e) {}
+    onReachBottom() {}
+    onShow() {
+      // 这是为了返回时初始化数据
+      // this.initDate()
+      // this.listRota()
+    }
+    onReady() {
+      //计算ScrollView高度
+      let _this = this
+      wx.createSelectorQuery().selectAll('#title-view').boundingClientRect(function(rect) {
+        let calendarHeight = rect[0].height
+        let windowHeight = wx.getSystemInfoSync().windowHeight // 屏幕的高度
+        let windowWidth = wx.getSystemInfoSync().windowWidth // 屏幕的宽度
+        _this.sViewHeight = windowHeight * 750 / windowWidth - calendarHeight * 750 / windowWidth
+        console.log("Scrollview的高度是："+_this.sViewHeight)
+        _this.initDate()
+      }).exec()
+    }
+    initDate() {
+      let now = new Date();
+      let month = utils.addZero(now.getMonth() + 1)
+      let day = utils.addZero(now.getDate());
+      this.queryMonth = now.getFullYear() + '-' + month;
+      this.currentDay = now.getFullYear() + '-' + month + '-' + day
+    }
+    isBlank(data) {
+      if (data == null || data == undefined || data == '') {
+        return true
+      }
+      return false
+    }
+    async getUser(userId) {
+      const data = await wxRequest.Get('getUserInfo', {
+        userId: userId
+      })
+      this.user.mobile = data.result.user.mobile
+      this.user.deptPhone = data.result.user.deptPhone
+      this.$apply()
+    }
+    async listRota() {
+      if(this.currentDay == 0){
+        let now = new Date();
+        let month = utils.addZero(now.getMonth() + 1)
+        let day = utils.addZero(now.getDate());
+        this.currentDay = now.getFullYear() + '-' + month + '-' + day
+      }
+      const data = await wxRequest.Get('daguanjia/listAllRota', {
+        queryMonth: this.queryMonth
+      });
+      if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+        this.showEmpty = false
+        if (data.result.items.length == 0) {
+          this.searchNone = true;
+        }
+        this.result = [];
+        let deptId = 0
+        let _this = this
+        this.todayIdx = -3
+        data.result.items.forEach((rota, index) => {
+          let leaders = []
+          if (!_this.isBlank(rota.leaderId)) {
+            let idArray = rota.leaderId.split(",")
+            let nameArray = rota.leaderName.split(",")
+            idArray.forEach((leaderId, index) => {
+              if (leaderId !== null && leaderId !== undefined && leaderId !== "") {
+                let leaderName = nameArray[index]
+                leaders.push({
+                  userId: leaderId,
+                  userName: leaderName
+                })
+              }
+            });
+          }
+          let dutys = []
+          if (!_this.isBlank(rota.dutyManIds)) {
+            let idArray = rota.dutyManIds.split(",")
+            let nameArray = rota.dutyManNames.split(",")
+            idArray.forEach((dutyId, index) => {
+              if (dutyId !== null && dutyId !== undefined && dutyId !== "") {
+                let dutyName = nameArray[index]
+                dutys.push({
+                  userId: dutyId,
+                  userName: dutyName
+                })
+              }
+            });
+          }
+          let newRota = {
+            rotaId: rota.id,
+            rotaDate: rota.rotaDate.substring(0, 10),
+            week: "日一二三四五六".charAt(new Date(rota.rotaDate).getDay()),
+            simpleData: rota.rotaDate.substring(8, 10),
+            leaders: leaders,
+            dutys: dutys
+          }
+          if (leaders.length > 0 || dutys.length > 0) {
+            _this.result.push(newRota)
+            //计算今日的索引，用户滚动到今日，便于用户查看值班人员
+            let rotaDate = new Date(rota.rotaDate.replace(/-/g, '/'))
+            if (new Date() > rotaDate) {
+              let lens = leaders.length > dutys.length ? leaders.length : dutys.length
+              if (lens > 0) {
+                _this.todayIdx = _this.todayIdx + Math.ceil(lens / 3)
+              }
+            }
+          }
+        });
+        this.$apply();
+        //如果是当前月份，混动到当天记录
+        if (utils.formatDate(new Date(), '-').substring(0, 7) == _this.queryMonth) {
+          let top = _this.todayIdx * 48
+          const self = _this
+          setTimeout(function() {
+            self.day_y = top
+            self.$apply()
+          }, 200) //延迟时间 这里是1秒
+        }
+      } else {
+        this.result = [];
+        this.showEmpty = true
+      }
+      this.$apply();
+    }
+  }
+</script>
+<style>
+  .btn {
+    color: #000;
+    width: 104rpx;
+    height: 60rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid #E0EEEE;
+    background: #E0EEEE;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+    line-height: 54rpx;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+  }
+  .btn-much {
+    width: 50%;
+    text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+  }
+</style>
+<style lang="scss" src="@/public/styles/phonebook.scss">
+
+</style>
+

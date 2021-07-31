@@ -1,0 +1,362 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <view style="padding: 40rpx 0 0 0;text-align: center;font-size: 42rpx;display:none">
+        选择规格
+      </view>
+      <input hidden name="id" value="{{ entry.id }}" />
+      <i-panel title="可选规格">
+        <view class="comment-btn">
+          <button wx:for="{{memberEntrys}}" wx:for-item="item" id="rules" wx:key="item.index" bindtap="memberNumChange" data-value="{{item.level}}" data-index="{{index}}" checked="{{item.selected}}" class="btn {{item.selected ? 'btn-selected' : ''}}">{{item.name}}</button>
+        </view>
+      </i-panel>
+      <i-panel title="使用周期">
+        <view class="comment-btn" style="justify-content:flex-start">
+          <button wx:for="{{years}}" wx:for-item="item" id="rules" wx:key="item.index" bindtap="periodChange" data-value="{{item.year}}" data-index="{{index}}" checked="{{item.selected}}" class="btn {{item.selected ? 'btn-selected' : ''}}">{{item.name}}</button>
+        </view>
+      </i-panel>
+      <i-panel title="服务说明">
+        <view style="padding: 20rpx 30rpx;color: #777;font-size: 24rpx;">
+          <view wx:for="{{selectedEntry.desc}}" wx:for-item="item" wx:key="item.index" style="margin-bottom: 4rpx;">{{item}}</view>
+        </view>
+      </i-panel>
+      <i-panel title="服务协议">
+        <view style="padding: 20rpx 30rpx;color: #777;font-size: 26rpx;display: flex;">
+          <radio class="radio" value="同意" checked="{{agree}}" @tap="agreeChange">
+            <text>同意</text>
+          </radio>
+          <view style="margin-top: 7rpx;color: #4682B4;" @tap="agreeLicense">软件许可使用与服务协议</view>
+        </view>
+      </i-panel>
+      <i-panel title="购买保障">
+        <view style="padding: 20rpx 30rpx;color: #aaa;font-size: 26rpx;display: flex;">
+          <view style="margin-bottom: 4rpx;">如需发票，请联系客服索取</view>
+        </view>
+      </i-panel>
+      <view style="padding:60rpx 20rpx 0 20rpx;{{type == 'user'?'display:none':''}}">
+        <button id="member" type="primary" open-type="share" style="width:98%;font-size: 28rpx;height: 92rpx;line-height: 92rpx;background:#19be6b"><view style="display:flex;justify-content: center;">
+              <view class="iconfont icon-send" style="color: #fff;font-size:40rpx;;padding-left: 10rpx;"></view><text style="padding-left:10rpx">可将本页面发送给苹果手机客户支付</text></view>
+            </button>
+      </view>
+      <view class="button-groups" style="height:110rpx;line-height:110rpx;">
+        <view class="delete-button" style="display: block;padding-left: 24rpx;">
+          <text style="font-size: 36rpx;color: red;display: block;height: 46rpx;line-height: 70rpx;">￥{{selectedPrice}}</text>
+          <text style="font-size: 24rpx;color: #777;display: block;height: 60rpx;line-height: 60rpx;padding-left: 8rpx;">有效至：{{endDate}}</text>
+        </view>
+        <view class="edit-button" @tap="submit" style="background: {{agree?'#2196F3':'#ccc'}};color: #fff;">
+          <text>确认支付</text>
+        </view>
+      </view>
+      <i-message id="message"></i-message>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import util from '@/utils/util.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class MemberPay extends wepy.page {
+    config = {
+      navigationBarTitleText: '选择规格',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-panel": "../../public/iview/panel/index",
+        "i-radio": "../../public/iview/radio/index"
+      }
+    }
+    data = {
+      entry: {
+        op: 1
+      },
+      checkRules: {
+        required: []
+      },
+      errMsgs: {},
+      memberEntrys: [],
+      selectedEntry: null,
+      selectedDatePeriod: '',
+      endDate: '',
+      selectedPrice: 0,
+      agree: false,
+      years: [{
+          "name": "一年",
+          "year": 1,
+          "selected": true
+        },
+        {
+          "name": "两年",
+          "year": 2,
+          "selected": false
+        }
+      ],
+      isTest: false,
+      type:"user"
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      agreeChange(e) {
+        this.agree = !this.agree
+      },
+      agreeLicense(e) {
+        wepy.navigateTo({
+          url: '/pages/user/member_agree'
+        })
+      },
+      memberNumChange(e) {
+        this.selectedEntry = this.memberEntrys[e.target.dataset.index]
+        for (let index = 0; index < this.memberEntrys.length; index++) {
+          let item = this.memberEntrys[index];
+          if (index == e.target.dataset.index) {
+            this.memberEntrys[index].selected = true
+          } else {
+            this.memberEntrys[index].selected = false
+          }
+        }
+        //设置周期选择
+        this.years = []
+        let i = 0
+        for (let datePeriod in this.selectedEntry.price) {
+          let priceName = datePeriod.replace("d", "天").replace("m", "月").replace("y", "年")
+          let price = this.selectedEntry.price[datePeriod];
+          let selected = false
+          if (i == 0) {
+            selected = true
+            this.selectedDatePeriod = datePeriod
+            this.selectedPrice = price
+            let unit = datePeriod.indexOf("d") !== -1 ? 'd' : (datePeriod.indexOf("m") !== -1 ? 'm' : 'y')
+            let number = datePeriod.substr(0, datePeriod.length - 1)
+            let now = new Date()
+            this.endDate = dateUtil.formatDate(dateUtil.dateAdd(now, Number(number), unit), "-")
+          }
+          let year = {
+            "name": priceName,
+            "selected": selected,
+            "datePeriod": datePeriod,
+            "price": price
+          }
+          this.years.push(year)
+          i++
+        }
+      },
+      periodChange(e) {
+        let priceEntry = this.years[e.target.dataset.index]
+        let datePeriod = priceEntry.datePeriod
+        this.selectedDatePeriod = datePeriod
+        this.selectedPrice = priceEntry.price
+        let unit = datePeriod.indexOf("d") !== -1 ? 'd' : (datePeriod.indexOf("m") !== -1 ? 'm' : 'y')
+        let number = datePeriod.substr(0, datePeriod.length - 1)
+        let now = new Date()
+        this.endDate = dateUtil.formatDate(dateUtil.dateAdd(now, Number(number), unit), "-")
+        for (let index = 0; index < this.years.length; index++) {
+          let item = this.years[index];
+          if (index == e.target.dataset.index) {
+            this.years[index].selected = true
+          } else {
+            this.years[index].selected = false
+          }
+        }
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async submit() {
+        //检查必填
+        let checked = true
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        if (!this.agree) {
+          await tip.confirm('需同意软件许可和使用协议才能提交', {}, '操作提示', false)
+          return
+        }
+        if (this.isTest) {
+          await tip.confirm('当前是演示用户，无需选择规格', {}, '操作提示', false)
+          return
+        }
+        if(Session.get('user_load_cache').companyId == 1){
+          await tip.confirm('请先加入或创建组织后再进行此操作，谢谢！', {}, '操作提示', false)
+          return
+        }
+        if (this.inTrial && this.selectedEntry.level == this.memberLevel) {
+          await tip.confirm('当前已在试用期内，请选择其他规格', {}, '操作提示', false)
+          return
+        }
+        if (this.empNum > this.selectedEntry.max) {
+          await tip.confirm('当前组织人数已经大于所选规格，请重新选择', {}, '操作提示', false)
+          return
+        }
+        this.pay()
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if(options.type != undefined){
+        this.type = options.type
+      }
+      this.getUser()
+    }
+    onShareAppMessage(ops) {
+      let title = this.user.name+'发送给您支付界面，支付成功后即可正式使用！'
+      let target = '/pages/user/member_pay'
+      return {
+        title: title,
+        path: target,
+        success: async function(res) {
+          tip.toast('已经发送成功！')
+        }
+      }
+    }
+    async getUser() {
+      let data = await wxRequest.Get('settings')
+      if (data != undefined && data.code >= 1) {
+        this.user = data.result.user
+        this.companyName = this.user.companyName
+        this.companyId = this.user.companyId
+        this.expiryDate = this.user.expiryDate
+        this.isMemberExpiry = this.user.isMemberExpiry
+        this.inTrial = this.user.inTrial
+        this.memberLevel = this.user.memberLevel
+        this.empNum = this.user.empNum
+        if (this.user.companyId == 3) {
+          this.isTest = true
+        } else {
+          this.isTest = false
+        }
+        this.getMemberLevel()
+      } else {
+        tip.error(data.message)
+      }
+      this.$apply()
+    }
+    async getMemberLevel() {
+      let url = 'member/findMemberLevel'
+      const data = await wxRequest.Get(url, {});
+      if (data.result !== undefined) {
+        data.result.forEach((entry, index) => {
+          let rule = JSON.parse(entry.rule)
+          entry.price = rule.price
+          entry.min = rule.min
+          entry.max = rule.max
+          if (index == 1) {
+            entry.selected = true
+            this.selectedEntry = entry
+            this.years = []
+            let i = 0
+            for (let datePeriod in entry.price) {
+              let priceName = datePeriod.replace("d", "天").replace("m", "月").replace("y", "年")
+              let price = entry.price[datePeriod];
+              let selected = false
+              if (i == 0) {
+                selected = true
+                this.selectedDatePeriod = datePeriod
+                this.selectedPrice = price
+                let unit = datePeriod.indexOf("d") !== -1 ? 'd' : (datePeriod.indexOf("m") !== -1 ? 'm' : 'y')
+                let number = datePeriod.substr(0, datePeriod.length - 1)
+                let now = new Date()
+                this.endDate = dateUtil.formatDate(dateUtil.dateAdd(now, Number(number), unit), "-")
+              }
+              let year = {
+                "name": priceName,
+                "selected": selected,
+                "datePeriod": datePeriod,
+                "price": price
+              }
+              this.years.push(year)
+              i++
+            }
+          }
+          entry.desc = entry.description == null ? '' : entry.description.split("#")
+          //在此可以对数据进行二次处理
+          this.memberEntrys.push(entry)
+        });
+      }
+      this.$apply();
+    }
+    // 微信支付
+    async pay() {
+      let that = this
+      tip.loading("支付中...")
+      let data = await wxRequest.Get("member/payMember", {
+        level: this.selectedEntry.level,
+        datePeriod: this.selectedDatePeriod,
+        payWayCode: 'WEIXIN',
+        payTypeCode: 'WX_PROGRAM_PAY'
+      })
+      if (data != undefined && data.code >= 1) {
+        let wxconfig = data.result
+        wx.requestPayment({
+          timeStamp: wxconfig.timestamp, // 支付签名时间戳，注意微信jssdk中的所有使用timestamp字段均为小写。但最新版的支付后台生成签名使用的timeStamp字段名需大写其中的S字符
+          nonceStr: wxconfig.noncestr, // 支付签名随机串，不长于 32 位
+          package: "" + wxconfig.prepayid, // 统一支付接口返回的prepay_id参数值，提交格式如：prepay_id=***）
+          signType: 'MD5', // 签名方式，默认为'SHA1'，使用新版支付需传入'MD5'
+          paySign: wxconfig.sign, // 支付签名
+          success: function(res) {
+            // let payData = await wxRequest.Get("member/payMember", {
+            //   level: this.selectedEntry
+            // })
+            // if (data != undefined && data.code >= 1) {} else {
+            tip.confirm('恭喜您已续费成功，铛铛将竭诚为您服务！', {}, '操作提示', false)
+            wepy.navigateBack({
+              delta: 1
+            })
+            // }
+          },
+          fail: function(res) {
+            tip.toast("已取消支付")
+          }
+        })
+      }
+      tip.loaded()
+    }
+  }
+</script>
+
+<style>
+  .btn {
+    color: red;
+    width: 160rpx;
+    height: 70rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid red;
+    background: #fff;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    padding: 0 15rpx;
+  }
+</style>
+
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

@@ -1,0 +1,316 @@
+<template>
+	<view class="container">
+		<view id="calendar-view" class="calendar">
+			<calendar id="calendar" bind:select="dayClick" bind:toggleType="toggleType"></calendar>
+		</view>
+		<view class="ljt-tab fs16" style="display: flex;">
+			<view class="{{ tabActive == 'leader' ? 'active' : '' }}" @tap="changeTab('leader')">带班领导</view>
+			<view class="{{ tabActive == 'duty' ? 'active' : '' }}" @tap="changeTab('duty')">值班人员</view>
+			<view style="border: 1px solid #f4f4f4;padding-top: 10rpx;">
+				<input class="weui-input" bindinput="handleSearch" confirm-type="search" placeholder="搜索" />
+			</view>
+		</view>
+		<scroll-view class="time-area" style="height:{{sViewHeight}}rpx" scroll-y>
+			<view class="content" style="display:flex;flex-wrap: wrap;justify-content:space-around">
+				<button wx:for="{{dataList.employeeList}}" wx:for-item="item" class="btn {{item.selected ? 'btn-selected' : ''}}" id="users" wx:key="item.index" bindtap="checkboxChange" data-value="{{item.userId}}" data-index="{{index}}" checked="{{item.selected}}">{{item.userName}}</button>
+			</view>
+		</scroll-view>
+	</view>
+</template>
+
+<script>
+	import wepy from 'wepy'
+	import wxRequest from '@/utils/wxRequest'
+	import tip from '@/utils/tip'
+	import Session from '@/utils/session'
+	import utils from '@/utils/date-util';
+	const NowDate = new Date()
+	export default class RotaSetting extends wepy.page {
+		config = {
+			navigationBarTitleText: '值班表管理',
+			"usingComponents": {
+				"calendar": "../../components/calendar/calendar"
+			}
+		}
+		data = {
+			today: NowDate.getDate(),
+			tabActive: 'duty',
+			startColor: '#FF7F00',
+			endColor: '#8B8B83',
+			days: [],
+			mutipleData: [],
+			singleData: [],
+			singleList: [],
+			daySelect: [],
+			week: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+			lastMonth: 'lastMonth',
+			nextMonth: 'nextMonth',
+			selectVal: '',
+			keyword: '',
+			sViewHeight: 0,
+			entry: {
+				rotaId: 0,
+				rotaDate: '',
+				dutyManIds: [],
+				dutyManNames: [],
+				leaderId: [],
+				leaderName: []
+			},
+			dataList: {
+				employeeList: []
+			}
+		};
+		onLoad() {
+			this.daySelect.push(this.daySelectObject(NowDate.getFullYear(), NowDate.getMonth() + 1, this.today, '#2196F3'))
+			this.initDate()	
+			this.initUser()
+		}
+		onReady() {
+			//计算ScrollView高度
+			let _this = this
+			wx.createSelectorQuery().selectAll('#calendar-view').boundingClientRect(function(rect) {
+				let calendarHeight = rect[0].height
+				let windowHeight = wx.getSystemInfoSync().windowHeight // 屏幕的高度
+				let windowWidth = wx.getSystemInfoSync().windowWidth // 屏幕的宽度
+				_this.sViewHeight = windowHeight * 750 / windowWidth - calendarHeight * 750 / windowWidth - 80	
+				_this.$apply()			
+			}).exec()
+		}
+		methods = {
+			dayClick: function(event) {
+				this.entry.rotaDate = event.detail
+				this.searchRota()
+			},
+			changeTab(item) {
+				this.tabActive = item
+				this.searchRota()
+			},
+			toggleType() {
+				let _this = this
+				wx.createSelectorQuery().selectAll('#calendar-view').boundingClientRect(function(rect) {
+					let calendarHeight = rect[0].height
+					let windowHeight = wx.getSystemInfoSync().windowHeight // 屏幕的高度
+					let windowWidth = wx.getSystemInfoSync().windowWidth // 屏幕的宽度
+					_this.sViewHeight = windowHeight * 750 / windowWidth - calendarHeight * 750 / windowWidth - 80
+					// console.log('windowHeight-px=' + windowHeight + 'px')
+					// console.log('windowHeight-rpx=' + (windowHeight * 750 / windowWidth) + 'rpx')
+					// console.log('windowWidth-px=' + windowWidth + 'px')
+					// console.log('calendarHeight-px=' + calendarHeight + 'px')
+					// console.log('calendarHeight-rpx=' + (calendarHeight * 750 / windowWidth) + 'rpx')
+					// console.log('calendarWidth-px=' + rect[0].width + 'px')
+					// console.log('calendarWidth-rpx=' + (rect[0].width * 750 / windowWidth) + 'rpx')
+					// console.log('scrowViewHeight-rpx=' + _this.sViewHeight)
+					_this.$apply();
+				}).exec()
+			},
+			checkboxChange(e) {
+				if(Session.get('user_load_cache').isMemberExpiry){
+				 	tip.confirm('服务已过期，现只有查看权限，请联系您组织内负责此业务的管理员续费后再进行此操作，谢谢！', {}, '服务过期提示', false)
+					return
+				}
+				let employee = this.dataList.employeeList[e.target.dataset.index]
+				employee.selected = !employee.selected
+				if (this.tabActive == 'duty') {
+					if (employee.selected) {
+						this.entry.dutyManIds.push(employee.userId)
+						this.entry.dutyManNames.push(employee.userName)
+					} else {
+						var index = this.entry.dutyManIds.indexOf(employee.userId + '');
+						if (index > -1) {
+							this.entry.dutyManIds.splice(index, 1);
+							this.entry.dutyManNames.splice(index, 1);
+						}
+					}
+				} else {
+					if (employee.selected) {
+						this.entry.leaderId.push(employee.userId)
+						this.entry.leaderName.push(employee.userName)
+					} else {
+						var index = this.entry.leaderId.indexOf(employee.userId + '');
+						if (index > -1) {
+							this.entry.leaderId.splice(index, 1);
+							this.entry.leaderName.splice(index, 1);
+						}
+					}
+				}
+				this.saveRota()
+			},
+			handleSearch(e) {
+				this.dataList.employeeList = []
+				this.keyword = e.detail.value
+				this.searchUser()
+			}
+		}
+		async initUser(){
+			const data = await wxRequest.Get('daguanjia/listCompPhoneBook', {
+				py: this.keyword
+			});
+			if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+				this.dataList.employeeList = data.result.items;				
+			} else {
+				this.dataList.employeeList = [];
+			}
+			this.$apply()
+		}
+		async searchUser() {
+			const data = await wxRequest.Get('daguanjia/listCompPhoneBook', {
+				py: this.keyword
+			});
+			if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+				this.dataList.employeeList = data.result.items;
+			} else {
+				this.dataList.employeeList = [];
+			}
+			//回显是否选中
+			this.dataList.employeeList.forEach(element => {
+				if (this.tabActive == 'duty') {
+					if (this.entry.dutyManIds.indexOf(element.userId + '') > -1) {
+						element.selected = true
+					} else {
+						element.selected = false
+					}
+				} else {
+					if (this.entry.leaderId.indexOf(element.userId + '') > -1) {
+						element.selected = true
+					} else {
+						element.selected = false
+					}
+				}
+			});
+			this.$apply();
+		}
+		async saveRota() {			
+			let url = 'daguanjia/modifyRota';
+			const data = await wxRequest.Get(url, {
+				rotaId: this.entry.rotaId,
+				rotaDate: this.entry.rotaDate,
+				dutyManIds: this.entry.dutyManIds.join(','),
+				dutyManNames: this.entry.dutyManNames.join(','),
+				leaderId: this.entry.leaderId.join(','),
+				leaderName: this.entry.leaderName.join(',')
+			});
+		}
+		async searchRota() {
+			const data = await wxRequest.Get('daguanjia/listAllRota', {
+				rotaDate: this.entry.rotaDate
+			});
+			if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+				let rota = data.result.items[0];
+				this.entry.rotaId = rota.id
+				this.entry.dutyManIds = this.isBlank(rota.dutyManIds) ? [] : rota.dutyManIds.split(",")
+				this.entry.dutyManNames = this.isBlank(rota.dutyManNames) ? [] : rota.dutyManNames.split(",")
+				this.entry.leaderId = this.isBlank(rota.leaderId) ? [] : rota.leaderId.split(",")
+				this.entry.leaderName = this.isBlank(rota.leaderName) ? [] : rota.leaderName.split(",")
+			} else {
+				this.entry.rotaId = 0
+				this.entry.dutyManIds = []
+				this.entry.dutyManNames = []
+				this.entry.leaderId = []
+				this.entry.leaderName = []
+			}
+			//回显是否选中
+			this.dataList.employeeList.forEach(element => {
+				if (this.tabActive == 'duty') {
+					if (this.entry.dutyManIds.indexOf(element.userId + '') > -1) {
+						element.selected = true
+					} else {
+						element.selected = false
+					}
+				} else {
+					if (this.entry.leaderId.indexOf(element.userId + '') > -1) {
+						element.selected = true
+					} else {
+						element.selected = false
+					}
+				}
+			});
+			this.$apply();
+		}
+		isBlank(data) {
+			if (data == null || data == undefined || data == '') {
+				return true
+			}
+			return false
+		}
+		/**
+		 * 时间参数组装
+		 * 默认取 daySelect 数组
+		 * 	daySelect[0] 当前日期
+		 * 	daySelect[1] 起始日期
+		 *  daySelect[2] 结束日期
+		 */
+		timeParams() {
+			let query = {}
+			let len = this.daySelect.length
+			if (len == 0) {
+				return query
+			}
+			if (len > 2) {
+				let start = this.daySelect[1]
+				let end = this.daySelect[2]
+				query.start_time = `${start.year}-${start.mon}-${start.day}`
+				query.end_time = `${end.year}-${end.mon}-${end.day}`
+			} else {
+				let start = this.daySelect[len - 1]
+				query.start_time = `${start.year}-${start.mon}-${start.day}`
+			}
+			return query
+		}
+		daySelectObject(year, month, day, bgColor) {
+			return {
+				year: year,
+				mon: month,
+				day: day,
+				background: bgColor,
+				month: 'current',
+				color: 'white'
+			}
+		}
+		initDate() {
+			let now = new Date();
+			let month = utils.addZero(now.getMonth() + 1)
+			let day = utils.addZero(now.getDate());
+			this.entry.rotaDate = now.getFullYear() + '-' + month + '-' + day;			
+		}
+		computed = {
+			monthAndDay() {
+				let str = ''
+				let query = this.timeParams()
+				if (typeof query.start_time != 'undefined') {
+					let startArray = query.start_time.split('-')
+					str = startArray[1] + '-' + startArray[2]
+				}
+				if (typeof query.end_time != 'undefined') {
+					let endArray = query.end_time.split('-')
+					str += ' ~ '
+					str += endArray[1] + '-' + endArray[2]
+				}
+				return str
+			}
+		}
+		components = {};
+	}
+</script>
+<style>
+	.btn {
+		color: red;
+		width: 167rpx;
+		height: 70rpx;
+		font-size: 24rpx;
+		padding: 0;
+		border: 1px solid red;
+		background: #fff;
+		border-radius: 4px;
+		margin: 15rpx 10rpx;
+		text-align: center;
+	}
+	.btn-selected {
+		border: 1px solid red;
+		color: white;
+		background: red;
+	}
+	.comment-btn {
+		display: flex;
+	}
+</style>
+<style lang="scss" src="@/public/styles/rota.scss"/>

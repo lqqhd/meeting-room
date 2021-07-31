@@ -1,0 +1,266 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <view style="padding: 40rpx 0;">
+        <i-steps current="{{current}}">
+          <i-step>
+            <view slot="title">
+              注册用户
+            </view>
+            <view slot="content">
+            </view>
+          </i-step>
+          <i-step>
+            <view slot="title">
+              选择企业
+            </view>
+            <view slot="content">
+            </view>
+          </i-step>
+          <i-step>
+            <view slot="title">
+              完成
+            </view>
+            <view slot="content">
+            </view>
+          </i-step>
+        </i-steps>
+      </view>
+      <input hidden name="id" value="{{ entry.id }}" />
+      
+      <i-input id="name" value="{{ entry.name }}" title="姓名" placeholder="填写姓名，便于与同事沟通" maxlength="50" bind:change="bindChange" right errorMessage="{{errMsgs.nameErrMsg}}" />
+      <i-input id="mobile" value="{{ entry.mobile }}" title="手机号" placeholder="请填写手机号" maxlength="20" bind:change="bindChange" right errorMessage="{{errMsgs.mobileErrMsg}}" />
+      <i-input id="valicode" value="{{ entry.password }}" title="验证码" placeholder="请填写手机验证码" maxlength="200" bind:change="bindChange" right errorMessage="{{errMsgs.passwordErrMsg}}" />
+      <view class="btn-box">        
+        <view class="biz-btn save" @tap="submit">{{entry.id == 0 || entry.id == undefined?"下一步":"修改"}}</view>
+      </view>
+      <i-message id="message"></i-message>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class EmployeeForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '填写用户信息',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index",
+        "i-steps": "../../public/iview/steps/index",
+        "i-step": "../../public/iview/step/index"
+      }
+    }
+    data = {
+      entry: {},
+      checkRules: {
+        required: [
+          "name",
+          "roles",
+        ]
+      },
+      errMsgs: {},
+      audit: false, //是否是审核状态
+      dict: {
+        rolesList: [{
+          value: '2',
+          selected: false,
+          title: '公司管理员'
+        }, {
+          value: '4',
+          selected: false,
+          title: '部门管理员'
+        }, {
+          value: '6',
+          selected: false,
+          title: '普通员工'
+        }]
+      },
+      dictTypes: {
+        deptId: 'department'
+      }
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      bindSelectChange(e) {
+        let idx = e.detail.detail == undefined ? e.detail.value : e.detail.detail.value
+        this.dict[e.currentTarget.id + 'Index'] = idx
+        this.entry[e.currentTarget.id] = this.dict[e.currentTarget.id + 'Array'][idx].value
+      },
+      bindSwitchChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? (e.detail.value ? 1 : 0) : (e.detail.detail.value ? 1 : 0))
+      },
+      bindDateChange(e) {
+        let dt = 'dt' + e.currentTarget.id.substring(0, 1).toUpperCase() + e.currentTarget.id.substring(1)
+        this[dt] = e.detail.value
+        this.entry[e.currentTarget.id] = dateTimePicker.getDateStr(e.detail.value, this[dt + 'Array'])
+      },
+      checkboxChange(e) {
+        let string = "rolesList[" + e.target.dataset.index + "]"
+        this.dict["rolesList"][e.target.dataset.index].selected = !this.dict.rolesList[e.target.dataset.index].selected
+        let rolesArray = this.dict.rolesList.filter(it => it.selected).map(it => it.value)
+        this.entry.roles = rolesArray.join(',')
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async del() {
+        await tip.confirm('确认要删除此条数据吗?', {}, '提示')
+        const data = await wxRequest.Get(`sys/removeEmployee`, {
+          employeeId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async submit() {
+        //检查必填
+        let checked = true
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        let bean = {}
+        for (let key in this.entry) {
+          bean[key] = this.entry[key]
+        }
+        bean.employeeId = this.entry.id
+        delete bean.user
+        let url = 'sys/modifyEmployee'
+        if (this.entry.id == 0 || this.entry.id == undefined) {
+          url = 'sys/addEmployee'
+        }
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if (options.id == undefined) {
+        this.entry.deptId = 2
+      } else {
+        let entry = Session.get("employee-for-modify")
+        Session.clear("employee-for-modify")
+        this.entry = entry
+        let _this = this
+        this.dict.rolesList.forEach(function(item, index, array) {
+          entry.roles.split(",").forEach(v => {
+            if (v == item.value) {
+              _this.dict["rolesList"][index].selected = true
+            }
+          })
+        });
+      }
+      //装载数据字典
+      this.getDict()
+    }
+    //获取数据字典
+    async getDict() {
+      for (let fieldId in this.dictTypes) {
+        let dictType = this.dictTypes[fieldId]
+        //先从缓存中获取
+        let dictValue = Session.get("dict-for-" + dictType)
+        this.initDictIdx(dictValue, fieldId)
+        let url = `sys/dict/listByType`
+        if (dictType == "department") {
+          url = `sys/listDepts`
+        }
+        const data = await wxRequest.Get(url, {
+          type: dictType
+        })
+        if (data != undefined && data.code >= 1) {
+          if (dictValue == undefined) {
+            dictValue = data.result
+            this.initDictIdx(dictValue, fieldId)
+            Session.set("dict-for-" + dictType, dictValue)
+          } else {
+            if (dictValue.toString() !== data.result.toString()) {
+              Session.set("dict-for-" + dictType, dictValue)
+              this.initDictIdx(dictValue, fieldId)
+            }
+          }
+        }
+      }
+      this.$apply()
+    }
+    //初始化数据字典索引
+    initDictIdx(dictValue, fieldId) {
+      if (dictValue != null) {
+        this.dict[fieldId + "Array"] = dictValue
+        if (this.entry[fieldId] != undefined) {
+          for (let j = 0; j < dictValue.length; j++) {
+            if (this.entry[fieldId] == dictValue[j].value) {
+              this.dict[fieldId + "Index"] = j
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  .btn {
+    color: red;
+    width: 150rpx;
+    height: 70rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid red;
+    background: #fff;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+  }
+</style>
+
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

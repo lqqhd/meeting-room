@@ -1,0 +1,312 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <input hidden name="id" value="{{ entry.id }}" />
+      <picker id="deptId" bindchange="bindSelectChange" value="{{dict.deptIdIndex}}" range-key="name" range="{{dict.deptIdArray}}">
+        <i-input id="dept" value="{{ dict.deptIdArray[dict.deptIdIndex]['name'] }}" title="所属部门" placeholder="请选择所属部门" disabled2 right rightIcon="enter" rightIconSize=18 errorMessage="{{errMsgs.deptErrMsg}}" />
+      </picker>
+      <i-input id="name" value="{{ entry.name }}" title="姓名" placeholder="请填写姓名" maxlength="50" bind:change="bindChange" right errorMessage="{{errMsgs.nameErrMsg}}" />
+      <i-input id="mobile" value="{{ entry.mobile }}" title="手机号" placeholder="请填写手机号" maxlength="20" bind:change="bindChange" right errorMessage="{{errMsgs.mobileErrMsg}}" />
+      <view class="item" style="height:100%">
+        <view class="item-name">用户角色</view>
+        <view class="comment-btn" style="flex-wrap: wrap;justify-content: left;">
+          <button wx:for="{{dict.rolesList}}" wx:for-item="item" id="roles" wx:key="item.index" bindtap="checkboxChange" data-value="{{item.value}}" data-index="{{index}}" checked="{{item.selected}}" class="btn {{item.selected ? 'btn-selected' : ''}}">
+                                {{item.title}}
+                            </button>
+        </view>
+      </view>
+    </view>
+    <i-input id="password" value="{{ entry.password }}" title="密码" placeholder="{{passwordHint}}" maxlength="200" bind:change="bindChange" right errorMessage="{{errMsgs.passwordErrMsg}}" />
+    <i-input id="sort" value="{{ entry.sort }}" type="number" title="序号" placeholder="请填写序号" maxlength="20" bind:change="bindChange" right errorMessage="{{errMsgs.sortErrMsg}}" />
+    <view class="btn-box">
+      <view class="biz-btn save" hidden="{{entry.status == 'AGREE'}} || entry.status == undefined" @tap="agree">审核通过</view>
+      <view class="biz-btn save" @tap="del">删除</view>
+      <view class="biz-btn save" @tap="submit">{{entry.id == 0 || entry.id == undefined?"保存":"保存"}}</view>
+    </view>
+    <i-panel title="注意">
+      <view style="padding: 20rpx 30rpx;color: #777;font-size: 24rpx;">        
+        <view style="margin-bottom: 12rpx;"><text style="font-size:18rpx">●</text> 在此页面增加的员工，需要用户绑定相同手机号后，才能生效</view>
+        
+        <!-- <view style="margin-bottom: 12rpx;"><text style="font-size:18rpx">●</text> 由于有客户退款情况，因此有30天账期，30天后即可结算</view> -->
+        <view style="height:120rpx;width:100%"></view>
+      </view>
+    </i-panel>
+    <i-message id="message" />
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class EmployeeForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '员工管理',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index"
+      }
+    }
+    data = {
+      entry: {
+        statusSwitch: false
+      },
+      checkRules: {
+        required: [
+          "name",
+          "roles",
+          "mobile"
+        ]
+      },
+      errMsgs: {},
+      audit: false, //是否是审核状态
+      dict: {
+        rolesList: [{
+          value: '2',
+          selected: false,
+          title: '公司管理员'
+        }, {
+          value: '4',
+          selected: false,
+          title: '部门管理员'
+        }, {
+          value: '6',
+          selected: false,
+          title: '普通员工'
+        }, {
+          value: '9',
+          selected: false,
+          title: '驾驶员'
+        }, {
+          value: '10',
+          selected: false,
+          title: '门卫'
+        }]
+      },
+      dictTypes: {
+        deptId: 'department'
+      },
+      passwordHint: ''
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      bindSelectChange(e) {
+        let idx = e.detail.detail == undefined ? e.detail.value : e.detail.detail.value
+        this.dict[e.currentTarget.id + 'Index'] = idx
+        this.entry[e.currentTarget.id] = this.dict[e.currentTarget.id + 'Array'][idx].value
+      },
+      bindSwitchChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? (e.detail.value ? 1 : 0) : (e.detail.detail.value ? 1 : 0))
+      },
+      bindDateChange(e) {
+        let dt = 'dt' + e.currentTarget.id.substring(0, 1).toUpperCase() + e.currentTarget.id.substring(1)
+        this[dt] = e.detail.value
+        this.entry[e.currentTarget.id] = dateTimePicker.getDateStr(e.detail.value, this[dt + 'Array'])
+      },
+      checkboxChange(e) {
+        this.dict["rolesList"][e.target.dataset.index].selected = !this.dict.rolesList[e.target.dataset.index].selected
+        let rolesArray = this.dict.rolesList.filter(it => it.selected).map(it => it.value)
+        this.entry.roles = rolesArray.join(',')
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async del() {
+        await tip.confirm('确认要删除此条数据吗?', {}, '提示')
+        const data = await wxRequest.Get(`sys/removeEmployee`, {
+          employeeId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async agree() {
+        await tip.confirm('确认要审核通过本员工吗?', {}, '提示')
+        const data = await wxRequest.Get(`sys/agreeEmployee`, {
+          employeeId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async submit() {
+        //检查必填
+        let checked = true
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        let bean = {}
+        for (let key in this.entry) {
+          bean[key] = this.entry[key]
+        }
+        bean.employeeId = this.entry.id
+        if (this.entry.statusSwitch) {
+          bean.status = "AGREE"
+        } else {
+          bean.status = "REJECT"
+        }
+        delete bean.user
+        let url = 'sys/modifyEmployee'
+        if (this.entry.id == 0 || this.entry.id == undefined) {
+          url = 'sys/addEmployee'
+        }
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if (options.id == undefined) {
+        this.passwordHint = '请填写密码'
+        this.checkRules.required.push("password")
+        this.dict["rolesList"][2].selected = true
+        this.entry.roles = '6,'
+      } else {
+        this.passwordHint = '不填写表示不修改密码'
+        var index = this.checkRules.required.indexOf('password');
+        if (index > -1) {
+          this.checkRules.required.splice(index, 1);
+        }
+        let entry = Session.get("employee-for-modify")
+        Session.clear("employee-for-modify")
+        this.entry = entry
+        let _this = this
+        this.dict.rolesList.forEach(function(item, index, array) {
+          entry.roles.split(",").forEach(v => {
+            if (v == item.value) {
+              _this.dict["rolesList"][index].selected = true
+            }
+          })
+        });
+        if (this.entry.status == 'NEW') {
+          this.entry.statusSwitch = false
+        } else {
+          this.entry.statusSwitch = true
+        }
+      }
+      //装载数据字典
+      this.getDict()
+    }
+    //获取数据字典
+    async getDict() {
+      for (let fieldId in this.dictTypes) {
+        let dictType = this.dictTypes[fieldId]
+        // let dictValue = Session.get("dict-for-" + dictType)
+        let dictValue = null
+        let url = `sys/dict/listByType`
+        if (dictType == "department") {
+          url = `sys/listDepts`
+          // dictValue = null
+        }
+        //先从缓存中获取
+        // this.initDictIdx(dictValue, fieldId)        
+        const data = await wxRequest.Get(url, {
+          type: dictType
+        })
+        if (data != undefined && data.code >= 1) {
+          if (dictValue == undefined) {
+            dictValue = data.result
+            this.initDictIdx(dictValue, fieldId)
+            // Session.set("dict-for-" + dictType, dictValue)
+          } else {
+            if (dictValue.toString() !== data.result.toString()) {
+              // Session.set("dict-for-" + dictType, dictValue)
+              this.initDictIdx(dictValue, fieldId)
+            }
+          }
+        }
+      }
+      if (this.entry.id == 0 || this.entry.id == undefined) {
+        this.dict['deptIdIndex'] = 0
+        this.entry['deptId'] = this.dict['deptIdArray'][0].value
+      }
+      this.$apply()
+    }
+    //初始化数据字典索引，用于回显
+    initDictIdx(dictValue, fieldId) {
+      if (dictValue != null) {
+        this.dict[fieldId + "Array"] = dictValue
+        if (this.entry[fieldId] != undefined) {
+          for (let j = 0; j < dictValue.length; j++) {
+            if (this.entry[fieldId] == dictValue[j].value) {
+              this.dict[fieldId + "Index"] = j
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  .btn {
+    color: red;
+    width: 150rpx;
+    height: 70rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid red;
+    background: #fff;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+  }
+</style>
+
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

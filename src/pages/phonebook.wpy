@@ -1,0 +1,191 @@
+<template>
+  <view class="container">
+    <view class="input-box" style="position: fixed;width: 100%;">
+      <input
+        style="margin:24rpx;"
+        confirm-type="搜索"
+        value="{{ keyword }}"
+        placeholder-class="input-placeholder"
+        placeholder="输入姓名首字母、姓名拼音、姓名进行搜索"
+        bindinput="handleSearch"
+      /> 
+    </view> 
+    <view class="statement-list" wx:if="{{ result.length > 0 }}" style="padding-top: 110rpx;">    
+      <view class="result-tip" wx:if="{{ keyword !== '' }}">共查询到 {{ result.length }} 位人员</view>
+      <repeat for="{{ result }}" key="k" index="v" item="user">
+        <view class="dept-title" wx:if="{{ user.deptType }}" style="display: flex;">
+          {{user.deptName}} <view hidden="{{user.deptPhone == '' || user.deptPhone == undefined }}" style="margin-left: 10rpx;">( {{user.deptPhone}} )</view>
+        </view>
+        <view class="statement" @tap="handleOpen1('{{ user }}')">
+          <view class="information">
+            <view class="icon">
+              <image src="{{ user.avatarUrl }}"></image>
+            </view>
+            <view class="st-title">
+              <view class="title">{{ user.userName }}</view>
+              <view class="title">{{ user.extPhone }}</view>
+              <view class="title">{{ user.mobile }}</view>
+            </view>
+          </view>
+        </view>
+      </repeat>   
+      <i-action-sheet visible="{{ visible1 }}" actions="{{ actions1 }}" show-cancel bind:cancel="handleCancel1" bind:click="handleClickItem1" />        
+      <view class="loading-icon" wx:if="{{ bottomLoading }}">
+        <i-spin></i-spin>
+      </view>
+      <i-load-more wx:if="{{ searchNone }}" loading="{{ false }}"/>
+    </view>
+    <!-- <view wx:if="{{ result.length == 0 }}" style="padding-top: 200rpx;">
+      <empty :title.sync="emptyTitle"></empty>
+    </view> -->
+  </view>
+  
+</template>
+
+<script>
+import wepy from 'wepy';
+import wxRequest from '@/utils/wxRequest';
+import Empty from '@/components/empty';
+import tip from '@/utils/tip';
+export default class SearchSetting extends wepy.page {
+  config = {
+    navigationBarTitleText: '通讯录',
+    usingComponents: {
+      'i-load-more': '../public/iview/load-more/index',
+      'i-spin': '../public/iview/spin/index',
+      'i-action-sheet': '../public/iview/action-sheet/index'
+    }
+  };
+
+  data = {
+    emptyTitle: '暂未查询到相关数据',
+    scrollTop: 0,
+    keyword: '',
+    page: 1,
+    result: [],
+    bottomLoading: false,
+    searchNone: false,
+    department: [],
+    deptUsers: {},
+    actions1: [
+            {
+                name: '选项1',
+            },
+            {
+                name: '选项2'
+            },
+            {
+                name: '去分享',
+                icon: 'share',
+                openType: 'share'
+            }
+        ],
+    visible1: false,
+    user:''
+  };
+
+  components = {
+    empty: Empty
+  };
+
+  methods = {
+    handleSearch(e) {
+      this.result = [];
+      this.keyword = e.detail.value;
+      this.bottomLoading = false;
+      this.searchNone = false;
+      this.page = 1;
+      this.doSearch();
+    },
+    statement (key, id) {
+        wepy.navigateTo({
+          url: `/pages/statements/detail?${key}=${id}`
+        })
+    },
+    handleOpen1 (user) {
+        this.user = user
+        this.actions1 = [{
+          name:'联系【'+user.userName+"】"
+        },{
+          name: '拨打手机',
+          icon: 'mobilephone_fill',
+          size: 16
+        },{
+          name: '拨打座机',
+          icon: 'mobilephone_fill',
+          size: 16
+        }
+        ]
+        this.visible1 = true
+    },
+    handleCancel1 () {        
+      this.visible1 = false
+    }
+    ,handleClickItem1 ({ detail }) {        
+        if(detail.index == 1){//拨打手机         
+          wx.makePhoneCall({
+            phoneNumber: this.user.mobile
+          })  
+        }else if(detail.index == 2){//拨打座机
+          wx.makePhoneCall({
+            phoneNumber: this.user.deptPhone
+          })  
+        }           
+    }
+  };
+
+  onPageScroll(e) {
+    // this.scrollTop = e.scrollTop;
+    // if (this.opacity !== 0.3 && e.scrollTop) {
+    //   this.opacity = 0.3;
+    //   this.$apply();
+    // }
+  }
+
+  onReachBottom() {
+    // this.bottomLoading = true
+    // this.page += 1
+    // this.doSearch()
+  }
+
+  onShow() {
+    // 这是为了返回时初始化数据
+    this.result = [];
+    this.page = 1;
+    this.doSearch();
+  }
+
+  async doSearch() {
+    const data = await wxRequest.Get('daguanjia/listCompPhoneBook', {
+      py: this.keyword,
+      pageNo: this.page
+    });
+    if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+      if (data.result.items.length == 0) {
+        this.searchNone = true;
+      }
+      this.department = [];
+      this.result = [];
+      let deptId = 0;
+      data.result.items.forEach((user, index) => {
+        if (user.deptId != deptId) {
+          user.deptType=true
+          deptId = user.deptId
+        }
+        if(user.mobile != null && user.mobile != '' && user.mobile != undefined && user.mobile.substring(0,3) == '100'){
+          user.mobile = ''
+        }
+        this.result.push(user)
+      });
+
+      //this.result = [...this.result, ...data.result.items];
+    } else {
+      this.result = [];
+    }
+    this.bottomLoading = false;
+    this.$apply();
+  }
+}
+</script>
+<style lang="scss" src="@/public/styles/phonebook.scss"></style>
+

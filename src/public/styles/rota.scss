@@ -1,0 +1,29 @@
+@import './_variable.scss';
+.container {
+	background:#ffffff;
+}
+.calendar {
+	// padding: 12px;
+}
+
+// tab 样式
+.ljt-tab {
+	height: 80rpx;
+	line-height: 80rpx;
+	background: white;
+	border-bottom:1px solid #efefef;
+	border-top:1px solid #efefef;
+	.time {
+		border-right: 1px solid #f4f4f4;
+		color: #999;
+	}
+	.active {
+		color: $primaryColor;
+		border-bottom: 2px solid $primaryColor;
+	}
+	> view {
+		display: inline-block;
+		width: 33%;
+		text-align: center;
+	}
+}

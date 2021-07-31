@@ -1,0 +1,163 @@
+<template>
+  <view class="container">
+    <view class="pannel-header" style="display:{{userRole > 2?'none':'flex'}}">
+      <view class="pannel-title">
+        <view class="title">当前组织封面</view>
+        <view class="sub-title"> ( 封面会应用到本组织所有成员 ) </view>
+      </view>
+      <view class="right-title" @tap="set()"></view>
+    </view>
+    <view class="header">
+      <image class="bg" src="{{ bannerUrl }}"></image>
+    </view>
+    <view class="select-section">
+      <i-panel title="封面图片">
+        <view class="cover-setting">
+          <view class="item" wx:for="{{ banners }}" @tap="setBanner('{{ item.url }}')">
+            <image src="{{ item.url }}"></image>
+            <view wx:if="{{ item.system == 0 }}" @tap.stop="deleteItem('{{ item.url }}')" class="close-item">x</view>
+          </view>
+          <view class="item upload" @tap="uploadUserBanner">
+            <image src="../../public/images/upload.png"></image>
+          </view>
+        </view>
+      </i-panel>
+      <i-action-sheet visible="{{ dataVisible }}" actions="{{ actions }}" show-cancel bind:cancel="handleCancel" bind:click="handleClickItem" />
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import Session from '@/utils/session'
+  import {
+    host
+  } from '@/utils/host'
+  export default class SettingHeader extends wepy.page {
+    config = {
+      navigationBarTitleText: '更换封面',
+      "usingComponents": {
+        "i-panel": "../../public/iview/panel/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-action-sheet": "../../public/iview/action-sheet/index"
+      }
+    }
+    data = {
+      dataVisible: false,
+      currentPosition: 1,
+      actionsList: [],
+      bannerUrl: '',
+      banners: []
+    }
+    computed = {
+      actions() {
+        return this.actionsList[this.currentPosition]
+      }
+    }
+    methods = {
+      handleCancel() {
+        this.dataVisible = false
+      },
+      handleClickItem(e) {
+        const action = this.actionsList[this.currentPosition][e.detail.index]
+        this.updatePosition(action.value, this.currentPosition)
+        this.dataVisible = false
+      },
+      showActionSheet(position) {
+        this.currentPosition = position
+        this.dataVisible = true
+      },
+      async setBanner(val) {
+        await wxRequest.Get('setting/setBanner', {
+          bannerUrl: val
+        })
+        Session.set('refresh', true)
+        this.getBanner()
+      },
+      async deleteItem(val) {
+        await tip.confirm('确认删除此封面吗！', {}, '提示')
+        const data = await wxRequest.Get('setting/delBanner', {
+          bannerUrl: val
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          this.getBanners()
+        } else {
+          tip.error(data.message)
+        }
+      },
+      isDefault(val) {
+        let aa = val
+      }
+    }
+    onShow() {
+      this.getBanner()
+      this.getBanners()
+    }
+    async getBanners() {
+      this.banners.length = 0
+      const data = await wxRequest.Get('setting/getBanners')
+      data.result.forEach(element => {
+        let system = (element.indexOf('banner/1/') !== -1 ? 1 : 0)
+        let banner = {
+          "url": element,
+          "system": system
+        }
+        this.banners.push(banner)
+      });
+      this.$apply()
+    }
+    async getBanner() {
+      const data = await wxRequest.Get('setting/getBanner')
+      this.bannerUrl = data.result
+      this.$apply()
+    }
+    async uploadUserBanner() {
+      let user = Session.get('user_load_cache')
+      if (user.companyId == 1) {
+        await tip.confirm('请创建组织后，再进行上传操作！', {}, '提示', false)
+        return
+      }
+      const choseImages = await wepy.chooseImage({
+        count: 1,
+        sizeType: ['compressed'],
+        sourceType: ['album', 'camera']
+      })
+      if (choseImages.tempFiles.length == 0) {
+        wx.showToast({
+          title: '上传失败， 请稍后再试',
+          icon: 'none',
+          mask: false,
+          duration: 1000
+        })
+        return false
+      }
+      if (choseImages.tempFiles[0].size > 500000) {
+        wx.showToast({
+          title: '上传失败， 文件大小不能大于500K',
+          icon: 'none',
+          mask: false,
+          duration: 3000
+        })
+        return false
+      }
+      let data = await wxRequest.Upload('setting/uploadBannerImg', choseImages.tempFiles[0].path, {
+        type: 'index_header_bg'
+      })
+      let result = JSON.parse(data.data)
+      if (result != undefined && result.code >= 1) {
+        this.getBanners()
+      } else {
+        tip.error(result.message)
+        console.log(result.message)
+      }      
+    }
+  }
+</script>
+<style lang="scss" src="@/public/styles/settings/header.scss">
+
+</style>

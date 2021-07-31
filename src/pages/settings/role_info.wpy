@@ -1,0 +1,90 @@
+<template>
+  <view class="container">
+    <view class="statement" style="background: #eee;margin: 0rpx;padding: 24rpx 32rpx;">
+          <view class="title" style="flex:1;color:#555">功能列表</view>
+          <view class="title" style="flex:1;color:#555;text-align: center;">普通员工</view>
+          <view class="title" style="flex:1;color:#555;text-align: center;">部门管理员</view>
+          <view class="title" style="flex:1;color:#555;text-align: center;">系统管理员</view>
+        </view>
+    <view class="statement-list" wx:if="{{ result.length > 0 }}">
+      <repeat for="{{ result }}" key="k" index="v" item="item">
+        <view class="statement">
+          <view class="title" style="flex:1;font-size: 28rpx;">{{ item.functionName }}</view>
+          <view class="title" style="flex:1;color:red;text-align: center;">{{ item.commonUser == '1'?'✔':''}}</view>
+          <view class="title" style="flex:1;color:red;text-align: center;">{{ item.deptUser== '1'?'✔':'' }}</view>
+          <view class="title" style="flex:1;color:red;text-align: center;">{{ item.sysUser== '1'?'✔':'' }}</view>
+        </view>
+      </repeat>
+      <view class="loading-icon" wx:if="{{ bottomLoading }}">
+        <i-spin></i-spin>
+      </view>
+      <i-load-more wx:if="{{ searchNone }}" loading="{{ false }}" />
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy';
+  import wxRequest from '@/utils/wxRequest';
+  import Empty from '@/components/empty';
+  import tip from '@/utils/tip';
+  export default class SearchSetting extends wepy.page {
+    config = {
+      navigationBarTitleText: '角色功能说明',
+      usingComponents: {
+        'i-load-more': '../../public/iview/load-more/index',
+        'i-spin': '../../public/iview/spin/index',
+      }
+    };
+    data = {
+      emptyTitle: '暂未查询到相关数据',
+      scrollTop: 0,
+      page: 1,
+      result: [],
+      bottomLoading: false,
+      searchNone: false,
+    };
+    components = {
+      empty: Empty
+    };
+    methods = {};
+    onShow() {
+      // 这是为了返回时初始化数据
+      this.result = [];
+      this.page = 1;
+      this.getDate();
+    }
+    async getDate() {
+      const data = await wxRequest.Get('sys/listRoleInfo', {
+        py: this.keyword,
+        pageNo: this.page
+      });
+      if (data.status != 404 && typeof data.result !== 'undefined' && data.result.items !== undefined) {
+        if (data.result.items.length == 0) {
+          this.searchNone = true;
+        }
+        this.department = [];
+        this.result = [];
+        let deptId = 0;
+        data.result.items.forEach((user, index) => {
+          if (user.deptId != deptId) {
+            user.deptType = true
+            deptId = user.deptId
+          }
+          if (user.mobile != null && user.mobile != '' && user.mobile != undefined && user.mobile.substring(0, 3) == '100') {
+            user.mobile = ''
+          }
+          this.result.push(user)
+        });
+      } else {
+        this.result = [];
+      }
+      this.bottomLoading = false;
+      this.$apply();
+    }
+  }
+</script>
+<style lang="scss" src="@/public/styles/phonebook.scss">
+
+</style>
+

@@ -1,0 +1,147 @@
+<template>
+  <view class="container"> 
+    <view class="grid">
+	<input hidden name="id" value="{{ entry.id }}" />
+	<i-input id="name" value="{{ entry.name }}" title="会议室名称" placeholder="请填写会议室名称" maxlength="64" bind:change="bindChange" right errorMessage="{{errMsgs.nameErrMsg}}"/>
+	<i-input id="xh" value="{{ entry.xh }}" type="number" title="顺序号" placeholder="请填写顺序号" maxlength="3" bind:change="bindChange" right errorMessage="{{errMsgs.xhErrMsg}}"/>
+	<i-cell title="是否激活">
+		<i-switch id="isActive" value="{{ entry.isActive }}" bind:change="bindSwitchChange" slot="footer"></i-switch>
+	</i-cell>
+	<i-cell title="是否需要审核">
+		<i-switch id="isNeedAudit" value="{{ entry.isNeedAudit }}" bind:change="bindSwitchChange" slot="footer"></i-switch>
+	</i-cell>
+</view>
+    <view class="btn-box">
+      <view class="biz-btn save" @tap="goBack" hidden="{{!assign}}">关闭</view>
+      <view class="biz-btn save" @tap="del">删除</view>
+      <view class="biz-btn save" @tap="submit">{{entry.id == 0 || entry.id == undefined?"提交":"修改"}}</view>
+    </view>
+    <i-message id="message" />
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class BoardroomForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '会议室管理',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index"
+      }
+    }
+    data = {
+      entry: {},
+      checkRules:{
+        required:[
+	"name",
+        ]
+      },
+      errMsgs:{},
+      audit: false, //是否是审核状态
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      bindSwitchChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? (e.detail.value?1:0) : (e.detail.detail.value?1:0))
+      },
+      bindDateChange(e) {
+        let dt = 'dt' + e.currentTarget.id.substring(0, 1).toUpperCase() + e.currentTarget.id.substring(1)
+        this[dt] = e.detail.value
+        this.entry[e.currentTarget.id] = dateTimePicker.getDateStr(e.detail.value, this[dt + 'Array'])
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async del() {
+        await tip.confirm('确认要删除此条数据吗?', {}, '提示')
+        const data = await wxRequest.Get(`daguanjia/removeBoardroom`, {
+          boardroomId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          Session.set('page-1',true)
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async submit() {    
+        if(Session.get('user_load_cache').companyId == 1){
+          tip.confirm('请先加入或创建组织后再进行此操作，谢谢！', {}, '提示', false)
+          return
+        }
+        if(Session.get('user_load_cache').isMemberExpiry){
+          await tip.confirm('服务已过期，现只有查看权限，请联系您组织内负责此业务的管理员续费后再进行此操作，谢谢！', {}, '服务过期提示', false)
+          return
+        }
+        
+        //检查必填
+        let checked = true         
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          } 
+        }             
+        if(!checked){
+          this.$apply()
+          return
+        }      
+        let bean = {}
+        for (let key in this.entry) {
+          bean[key] = this.entry[key]
+        }
+        bean.boardroomId = this.entry.id
+        delete bean.user
+        let url = 'daguanjia/modifyBoardroom'
+        if (this.entry.id == 0 || this.entry.id == undefined) {
+          url = 'daguanjia/addBoardroom'
+        }
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          Session.set('page-1',true)
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if (options.id == undefined) {
+      } else {
+        let entry = Session.get("boardroom-for-modify")
+        Session.clear("boardroom-for-modify")
+        this.entry = entry
+      }
+    }
+  }
+</script>
+<style lang="scss" src="@/public/styles/common_form.scss"/>

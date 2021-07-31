@@ -1,0 +1,220 @@
+<script>
+  import wepy from 'wepy'
+  import 'wepy-async-function'
+  import {
+    setStore,
+    getStore
+  } from 'wepy-redux'
+  import configStore from './store'
+  import {
+    asyncList
+  } from '@/store/actions'
+  import wxRequest from '@/utils/wxRequest'
+  import Session from '@/utils/session'
+  setStore(configStore())
+  export default class extends wepy.app {
+    config = {
+      pages: [
+        "pages/index",
+        //"pages/boardroom_apply",
+        "pages/chart",
+        "pages/phonebook",
+        "pages/setting",
+        // 值班表
+        "pages/rota/rota",
+        "pages/rota/rota_list",
+        //审批
+        "pages/audit/audit",
+        //会议室预约
+        "pages/boardbook/boardbook_form",
+        //车辆预约
+        "pages/carbook/carbook_form",
+        "pages/carbook/carbook_list",
+        //"pages/carbook/car_apply",
+        //车辆管理
+        "pages/car/car_form",
+        "pages/car/car_list",
+        //会议室管理
+        "pages/boardroom/boardroom_form",
+        "pages/boardroom/boardroom_list",
+        //组织机构管理
+        "pages/sysOffice/sysOffice_form",
+        "pages/sysOffice/sysOffice_list",
+        "pages/employee/employee_form",
+        //用户注册（加入组织）
+        "pages/user/join_corp_form",
+        "pages/user/bind_user_form",
+        "pages/user/create_corp_form",
+        "pages/user/member_pay",
+        "pages/user/member_agree",
+        "pages/user/invite_user",
+        "pages/user/invite_join",
+        "pages/user/modify_mobile",
+        //公告
+        "pages/publish/publish_form",
+        "pages/publish/publish_list",
+        "pages/publish/publish_detail",
+        // 设置
+        "pages/settings/feedback",
+        "pages/settings/header",
+        "pages/settings/home_setting",
+        "pages/settings/user_info",
+        "pages/settings/name_edit",
+        "pages/settings/avatar_edit",
+        "pages/settings/nickname_edit",
+        "pages/settings/about",
+        "pages/settings/role_info",
+        "pages/settings/contact",
+        // 消息
+        "pages/message",
+        "pages/message/detail",
+        // 好友
+        "pages/friends/index",
+        "pages/friends/search"
+      ],
+      window: {
+        backgroundColor: "#efefef",
+        navigationBarBackgroundColor: "#1976D2",
+        backgroundTextStyle: "light",
+        navigationBarTitleText: "铛铛办公",
+        navigationBarTextStyle: "white",
+        enablePullDownRefresh: false
+      },
+      tabBar: {
+        backgroundColor: "#fff",
+        color: "#000000",
+        selectedColor: "#2196F3",
+        list: [{
+            pagePath: "pages/index",
+            iconPath: "public/images/settings/ic_nav_home.png",
+            selectedIconPath: "public/images/settings/ic_nav_home_active.png",
+            text: "首页"
+          },
+          {
+            pagePath: "pages/carbook/carbook_list",
+            iconPath: "public/images/settings/ic_nav_car.png",
+            selectedIconPath: "public/images/settings/ic_nav_car_active.png",
+            text: "车辆"
+          },
+          {
+            pagePath: "pages/phonebook",
+            iconPath: "public/images/settings/ic_nav_phonebook.png",
+            selectedIconPath: "public/images/settings/ic_nav_phonebook_active.png",
+            text: "通讯录"
+          },
+          {
+            pagePath: "pages/setting",
+            iconPath: "public/images/settings/ic_nav_my.png",
+            selectedIconPath: "public/images/settings/ic_nav_my_active.png",
+            text: "我的"
+          }
+        ]
+      },
+      networkTimeout: {
+        request: 100000,
+        downloadFile: 100000
+      },
+      permission: {
+        "scope.userLocation": {
+          "desc": "您的位置信息将用于行车或打卡记录的地理位置"
+        }
+      },
+      debug: false,
+      "plugins": {}
+    }
+    globalData = {
+      user: {}
+    }
+    onLaunch() {
+      //this.getUser()
+      this.checkVersionUpdate()
+      this.uploadData()
+    }
+    // 预加载用户
+    async getUser() {
+      const data = await wxRequest.Get('users')
+      if (typeof data !== 'undefined') {
+        this.globalData.user = data
+      }
+    }
+    // 检查更新
+    checkVersionUpdate() {
+      // wxRequest.WX('check_update', {}, (res) => {
+      //   const data = res.data
+      //   if (data === 0) return false
+        if (wx.canIUse('getUpdateManager')) {
+          const updateManager = wx.getUpdateManager()
+          updateManager.onCheckForUpdate(function(res) {
+            if (res.hasUpdate) {
+              updateManager.onUpdateReady(function() {
+                wx.showModal({
+                  title: '更新提示',
+                  content: '新版本已经准备好，是否重启应用？',
+                  success: function(res) {
+                    if (res.confirm) {
+                      updateManager.applyUpdate()
+                    }
+                  }
+                })
+              })
+              updateManager.onUpdateFailed(function() {
+                wx.showModal({
+                  title: '已经有新版本了哟~',
+                  content: '新版本已经上线啦~，请您删除当前小程序，重新搜索打开哟~'
+                })
+              })
+            }
+          })
+        } else {
+          wx.showModal({
+            title: '提示',
+            content: '当前微信版本过低，无法使用该功能，请升级到最新微信版本后重试。'
+          })
+        }
+      // })
+    }
+    uploadData() {
+      // 记录请求错误的日志
+      let errs = Session.getErrors()
+      if (!!errs && errs.length > 0) {
+        for (let index = 0, length = errs.length; index < length; ++index) {
+          const err = errs[index]
+          wxRequest.PostBasic(`error_upload`, {
+            err: err
+          }, {}, () => {
+            errs.splice(errs.indexOf(err), 1)
+            Session.set(Session.key['errorKey'], errs)
+          })
+        }
+      }
+      // 同步本地数据到远程服务端
+      let statements = Session.getStatements()
+      if (!!statements && statements.length > 0) {
+        for (let index = 0, length = statements.length; index < length; ++index) {
+          const statement = statements[index]
+          wxRequest.PostBasic(`statements`, statement, {}, () => {
+            statements.splice(statements.indexOf(statement), 1)
+            Session.set(Session.key['localStatementKey'], statements)
+          })
+        }
+      }
+    }
+    constructor() {
+      super()
+      this.use('requestfix')
+      this.use('promisify')
+      this.intercept('request', {
+        config(p) {
+          return p;
+        },
+        success(p) {
+          return p;
+        }
+      });
+    }
+  }
+</script>
+<style lang="less">
+  @import "/public/styles/iconfont.wxss";
+  @import "/public/styles/common.less";
+</style>

@@ -1,0 +1,110 @@
+<template>
+  <view class="container">
+    <view class="logo-image">
+      <image mode='scaleToFill' src="../../public/images/logo.png"></image>
+    </view>
+
+    <view class="app-info">
+      <view>铛铛办公 {{ about.version }}</view>
+    </view>
+
+    <view class="description" style="font-size: 28rpx;">
+      <view>
+        {{ about.content }}
+      </view>
+    </view>
+
+    <view class="bottom" style="padding: 100px 0 50px 0;font-size: 28rpx;">
+      <view wx:for="{{ about.others }}" wx:for-item="item" wx:key="item.index" >
+        <view style="text-align: center;">{{ item }}</view>
+      </view>
+    </view>
+
+    <i-button open-type="contact">直接联系我</i-button>
+    <i-button bind:click="cleanSession">清空缓存</i-button>
+   
+      <view style="text-align: center;padding: 50rpx 0 100rpx 0;font-size: 28rpx;">
+        {{ about.company }}
+      </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '../../utils/tip'
+  import Session from '@/utils/session'
+
+  export default class About extends wepy.page {
+    config = {
+      navigationBarTitleText: '关于铛铛办公',
+      "usingComponents": {
+        "i-button": "../../public/iview/button/index"
+      }
+    }
+    
+    data = {
+      about: {
+        version:'1.0.11',
+        content:'为政府、企事业单位提供会议室预约、车辆预约、通讯录、值班表管理、公告、内部论坛等功能，小巧、精致的办公效率利器！',
+        others:["客服电话：13811351135","客服微信：lqqhd123456","Email：dangdang@jikebang.cn"],
+        company:"Copyright © 2019-2020 北京极客帮科技有限公司"
+      }
+    }
+
+    onShow () {
+      this.getVersion()
+      this.getContent()
+      this.getOthers()
+      this.getCompany()
+    }
+
+    methods = {
+      cleanSession () {
+        wx.clearStorage()
+        tip.toast('清理成功')
+      }
+    }
+
+    async getVersion() {
+      const data = await wxRequest.Get('setting/getPlatformSetting', {
+        key: 'about_version'
+      })
+      if (data.code >= 1 && data.result != "") {
+        this.about.version = data.result
+      }
+      this.$apply()
+    }
+    async getContent() {
+      const data = await wxRequest.Get('setting/getPlatformSetting', {
+        key: 'about_content'
+      })
+      if (data.code >= 1 && data.result != "") {
+        this.about.content = data.result
+      }
+      this.$apply()
+    }
+    async getOthers() {
+      const data = await wxRequest.Get('setting/getPlatformSetting', {
+        key: 'about_others'
+      })
+      if (data.code >= 1 && data.result != "") {       
+        this.about.others = data.result.split(",")
+      }
+      this.$apply()
+    }
+    async getCompany() {
+      const data = await wxRequest.Get('setting/getPlatformSetting', {
+        key: 'about_company'
+      })
+      if (data.code >= 1 && data.result != "") {
+        this.about.company = data.result
+      }
+      this.$apply()
+    }
+
+    
+    
+  }
+</script>
+<style lang="scss" src="@/public/styles/about.scss"></style>

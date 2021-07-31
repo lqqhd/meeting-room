@@ -1,0 +1,246 @@
+@import './_variable.scss';
+page, .container{
+  height: 100%;
+}
+.container {
+  > view {
+    width: 100%;
+    display: block;
+  }
+}
+.header {
+	position:relative;
+	.background-img {
+    width:100%;
+    height:150px;
+    position: relative;
+    box-sizing:border-box;
+    z-index:-1;
+    overflow-y:hidden;
+    image {
+      width: 100%;
+      height: 100%;
+    }
+  }
+  .pannel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding:15px 20px 0px 20px;
+    border-top:10px solid #f1f1f1;
+    .pannel-title {
+      display: flex;
+      align-items:center;
+      .title{
+        font-size: 17px;
+      }
+      .sub-title{
+        font-size:12px;
+        padding-left: 5px;
+        color:#757575;
+        margin-top:5px;
+      }
+    }
+    .right-title{
+      font-size: 12px;
+      color:#2196F3;
+      margin-top:5px;
+    } 
+    .right-more{
+      font-size: 12px;
+      color:#757575;
+      margin-top:5px;
+    }       
+  }
+  .pannel-content{
+    display: flex;
+    align-items: center;
+    justify-items: center;
+    padding:18px 0;
+    font-size:24rpx;
+    > view {
+      flex: 1;
+      text-align:center;
+      image {
+        width: 40px;
+        height: 40px;       
+      }
+    }
+    .icon-top{
+      box-shadow: 5px 5px 5px rgba(0,0,0,0.4);
+      border-radius: 20rpx;
+    }
+    .fun-txt{
+      margin-top: 10rpx;
+    }
+  }
+  .level-2 {
+    position:absolute;
+    bottom:32rpx;
+    width:100%;
+    .today-expend {
+      font-size:64rpx;
+      margin-bottom:24rpx;
+    }
+    > view {
+      padding:0;
+    }
+  }
+  .cover-title{
+    font-size: 24rpx;
+    color: white;
+    background: rgba(0,0,0,0.3);
+    padding: 4rpx 15rpx 8rpx 12rpx;
+    border-radius: 4rpx;
+  }
+  .no-read-msg:after {
+    content: '';
+    position: absolute;
+    width: 16rpx;
+    height: 16rpx;
+    top: 0;
+    right: 0;
+    border-radius: 50%;
+    background: #FF0000;
+  }
+  .pay-num {
+    background:rgb(32,86,174);
+    margin:0 4rpx;
+  }
+  .notification {
+    position:absolute;
+    top:42rpx;
+    right:42rpx;
+    width:60rpx;
+    height:60rpx;
+    background:black;
+    border-radius:50%;
+    padding:8rpx;
+    image {
+      width:100%;
+      height:100%;
+    }
+  }
+  .jz-icon-xiaoxi {
+    font-size: 54rpx;
+    position: absolute;
+    top: 32rpx;
+    right: 48rpx;
+  }
+}
+
+.zan-btns.new-record {
+  margin: 0;
+  .jz-btn {
+    background: $primaryColor;
+    color: white;
+    margin:15px;
+  }
+}
+
+.statement-list {
+  margin-bottom: 40rpx;
+  > .surplus {
+    text-align: center;
+    > text {
+      font-size: 24rpx;
+      padding:0 12rpx;
+    }
+  }
+  > .total {
+    text-align: right;
+    margin:0 32rpx;
+    > text {
+      font-size: 24rpx;
+      &:first-child {
+        padding-right: 16rpx;
+      }
+    }
+  }
+}
+.row {
+  display: block;
+  align-items: center;
+  margin:0 20px;
+  border-bottom: 2rpx solid $borderColor;
+  padding:16rpx 0;
+  color: $primaryText;
+  .information {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    margin-top:8px;
+  }
+  .user-info{
+    display: flex;
+    align-items:center;
+      .title{
+        font-size: 14px;
+      }
+      .icon {
+        margin-right: 16rpx;
+        display: flex;
+        align-items: center;
+        image {
+          width:40rpx;
+          height:40rpx;
+          border-radius:40px;
+        }
+      }
+  }  
+  .st-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width:100%;
+    > view {
+      margin-bottom: 4rpx;
+    }
+    .title {
+      font-size: 28rpx;
+    }
+    .description {
+      color: $secondaryText;
+      font-size: 24rpx;
+    }
+    .time {
+      color: $secondaryText;
+      font-size: 24rpx;
+    }
+  }
+
+  .st-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width:100%;
+    > view {
+      margin-bottom: 4rpx;
+    }
+    .title {
+      font-size: 28rpx;
+    }
+    .description {
+      color: $secondaryText;
+      font-size: 24rpx;
+      margin-left:20rpx;
+      display:flex;
+    }
+    .time {
+      color: $secondaryText;
+      font-size: 24rpx;
+      margin-left:20rpx;
+    }
+  }
+
+  
+
+}
+.no-more-data {
+  text-align: center;
+  color: #999;
+  background: #efefef;
+  height: 60rpx;
+  line-height: 60rpx;
+  font-size: 28rpx;
+}

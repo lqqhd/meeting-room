@@ -1,0 +1,63 @@
+<view class="i-item" hidden="{{hidden}}">
+    <view class="i-class i-cell i-input {{ disabled ? 'i-input-disabled' : '' }} {{ error ? 'i-input-error' : '' }} {{ mode === 'wrapped' ? 'i-input-wrapped' : '' }}">
+        <view wx:if="{{ title }}" class="i-cell-hd i-input-title {{ required ? 'required' : '' }}">{{ title }}</view>
+        <textarea
+            wx:if="{{ type === 'textarea' }}"
+            auto-height
+            disabled="{{ disabled || disabled2 }}"
+            focus="{{ autofocus }}"
+            value="{{ value }}"
+            placeholder="{{ placeholder }}"
+            maxlength="{{ maxlength }}"
+            class="i-input-input i-cell-bd {{ right ? 'i-input-input-right' : '' }}"
+            style="{{style}}"
+            placeholder-class="i-input-placeholder"
+            bindinput="handleInputChange"
+            bindfocus="handleInputFocus"
+            bindblur="handleInputBlur"
+        ></textarea>
+        <textarea
+            wx:elif="{{ type === 'textarea2' }}"
+            disabled="{{ disabled || disabled2 }}"
+            focus="{{ autofocus }}"
+            value="{{ value }}"
+            placeholder="{{ placeholder }}"
+            maxlength="{{ maxlength }}"
+            class="i-input-input i-cell-bd {{ right ? 'i-input-input-right' : '' }}"
+            style="{{myStyle}}"
+            placeholder-class="i-input-placeholder"
+            bindinput="handleInputChange"
+            bindfocus="handleInputFocus"
+            bindblur="handleInputBlur"
+        ></textarea>
+        <input
+            wx:else
+            type="{{ type }}"
+            disabled="{{ disabled || disabled2 }}"
+            focus="{{ autofocus }}"
+            value="{{ value }}"
+            placeholder="{{ placeholder }}"
+            maxlength="{{ maxlength }}"
+            class="i-input-input i-cell-bd {{ right ? 'i-input-input-right' : '' }}"
+            placeholder-class="i-input-placeholder"
+            bindinput="handleInputChange"
+            bindfocus="handleInputFocus"
+            bindblur="handleInputBlur"
+        />
+        <i-icon 
+            wx:if="{{ rightIcon }}" 
+            style="padding-left: 6rpx;" 
+            type="{{rightIcon}}" 
+            size="{{rightIconSize}}" 
+            color="{{rightIconColor}}"
+        />
+    </view>
+    <view wx:if="{{ errorMessage || remark }}" class="err-view">
+        <text style="color:#ccc;font-size:12px">{{remark}}</text>
+        <text style="color:red;font-size:12px">{{errorMessage}}</text>
+    </view>
+    <view class="div-line"></view>
+</view>
+
+
+

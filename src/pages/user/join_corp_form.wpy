@@ -1,0 +1,171 @@
+<template>
+  <view class="container">
+    <view style="padding: 40rpx 0;text-align: center;font-size: 42rpx;">
+      加入组织
+    </view>
+    <input hidden name="id" value="{{ entry.id }}" />
+    <i-radio-group current="{{current}}" bindchange="handleClick">
+      <i-radio value="方式一、通过部门邀请码加入（无需审核）"> </i-radio>
+      <i-input id="code" value="{{ entry.code }}" title="" placeholder="请填写邀请码" maxlength="50" bind:change="bindChange" errorMessage="{{errMsgs.codeErrMsg}}" />
+      <i-radio value="方式二、通过组织名称加入（需管理员审核）"> </i-radio>
+      <i-input id="name" value="{{ entry.name }}" title="" placeholder="请填写组织名称" maxlength="20" bind:change="bindChange" errorMessage="{{errMsgs.nameErrMsg}}" />
+    </i-radio-group>
+    <view class="btn-box">
+      <view class="biz-btn save" @tap="submit">{{entry.id == 0 || entry.id == undefined?"加入":"修改"}}</view>
+    </view>
+    <button type="primary" @tap="toNew()" style="width: 92%;font-size: 28rpx;height: 86rpx;line-height: 86rpx;background:#aaa"><view style="display:flex;justify-content: center;">
+        <text>创建新组织</text></view>
+      </button>
+    <i-message id="message"></i-message>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class JoinCorpForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '填写用户信息',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index",
+        "i-panel": "../../public/iview/panel/index",
+        "i-radio-group": "../../public/iview/radio-group/index",
+        "i-radio": "../../public/iview/radio/index"
+      }
+    }
+    data = {
+      entry: {},
+      checkRules: {
+        required: []
+      },
+      errMsgs: {},
+      current: '方式一、通过部门邀请码加入（无需审核）'
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      bindSelectChange(e) {
+        let idx = e.detail.detail == undefined ? e.detail.value : e.detail.detail.value
+        this.dict[e.currentTarget.id + 'Index'] = idx
+        this.entry[e.currentTarget.id] = this.dict[e.currentTarget.id + 'Array'][idx].value
+      },
+      bindSwitchChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? (e.detail.value ? 1 : 0) : (e.detail.detail.value ? 1 : 0))
+      },
+      bindDateChange(e) {
+        let dt = 'dt' + e.currentTarget.id.substring(0, 1).toUpperCase() + e.currentTarget.id.substring(1)
+        this[dt] = e.detail.value
+        this.entry[e.currentTarget.id] = dateTimePicker.getDateStr(e.detail.value, this[dt + 'Array'])
+      },
+      checkboxChange(e) {
+        let string = "rolesList[" + e.target.dataset.index + "]"
+        this.dict["rolesList"][e.target.dataset.index].selected = !this.dict.rolesList[e.target.dataset.index].selected
+        let rolesArray = this.dict.rolesList.filter(it => it.selected).map(it => it.value)
+        this.entry.roles = rolesArray.join(',')
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      handleClick(e) {
+        this.current = e.detail.value
+        this.errMsgs.codeErrMsg = '';
+        this.errMsgs.nameErrMsg = '';
+      },
+      toNew(e) { 
+        wepy.navigateTo({
+          url: '/pages/user/create_corp_form'
+        })
+      },
+      async submit() {
+        //检查必填
+        let checked = true
+        if (this.current == "方式一、通过部门邀请码加入（无需管理员审核）") {
+          if (this.entry.code == '' || this.entry.code == undefined) {
+            this.errMsgs.codeErrMsg = '本项为必填项';
+            checked = false;
+          }
+        } else {
+          if (this.entry.name == '' || this.entry.name == undefined) {
+            this.errMsgs.nameErrMsg = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        let bean = {
+          org: this.current == "方式二、通过组织名称加入（需管理员审核）" ? this.entry.name : this.entry.code
+        }
+        let url = 'sys/joinCompany'
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          Session.set('refresh', true)
+          Session.set('refresh_office', true)
+          //通知Tab页面需要刷新
+          for (let index = 0; index < 5; index++) {
+            Session.set('page-' + index, true)
+          }
+          let msg = this.current == "方式二、通过组织名称加入（需管理员审核）" ? '已通知管理员进行审核，请耐心等待' : '您的角色默认为普通员工，如需成为部门或公司管理员，请联系管理员修改！'
+          if (data.message != undefined && data.message != '') {
+            msg = data.message
+          }
+          tip.confirm(msg, {}, '加入成功', false).then(function(value) {
+            wepy.switchTab({
+              url: '/pages/index'
+            })
+          }, function(error) {});
+        } else {
+          if (data.message != undefined) {
+            $Message({
+              content: data.message,
+              type: 'error',
+              duration: 5
+            });
+          }
+        }
+      }
+    }
+    computed = {}
+    onLoad(options) {}
+  }
+</script>
+
+<style>
+  .btn {
+    color: red;
+    width: 150rpx;
+    height: 70rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid red;
+    background: #fff;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+  }
+</style>
+
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

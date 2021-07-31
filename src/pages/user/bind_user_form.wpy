@@ -1,0 +1,245 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <view style="padding: 40rpx 0;text-align: center;font-size: 42rpx">
+        {{useWx?'绑定用户':'完善信息（可选）'}}
+      </view>
+      <input hidden name="id" value="{{ entry.id }}" />
+      <view style="display:{{useWx?'none':'block'}}">
+        <i-input id="name" value="{{ entry.name }}" title="姓名" placeholder="填写姓名，便于与同事沟通" maxlength="50" bind:change="bindChange" errorMessage="{{errMsgs.nameErrMsg}}" />
+        <i-input id="mobile" value="{{ entry.mobile }}" title="手机号" placeholder="请填写手机号" maxlength="20" bind:change="bindChange" errorMessage="{{errMsgs.mobileErrMsg}}" />
+        <view style="display:flex">
+          <i-input id="valicode" style="width: 64%;" value="{{ entry.valicode }}" title="验证码" placeholder="请填写手机验证码" maxlength="200" bind:change="bindChange" errorMessage="{{errMsgs.passwordErrMsg}}" />
+          <view @tap="getCode" style="height: 100rpx;line-height: 100rpx;width: 30%;">{{vbTime}}{{suffix}}</view>
+        </view>
+        <view style="padding-top:100rpx;padding-bottom:20rpx">
+          <i-button bind:click="submit" type="primary" shape="circle" size="small">下一步</i-button>
+        </view>
+      </view>
+      <i-panel title="操作说明">
+        <view style="padding: 20rpx 30rpx;color: #777;font-size: 24rpx;">
+          <view style="margin-bottom: 12rpx;">● 办公大管家APP中的用户，请务必填写手机号（建立关联）！</view>
+          <view style="margin-bottom: 12rpx;">● 如果跳过此步，后续可在【我的-设置】中修改完善</view>
+          <view style="margin-bottom: 12rpx;">● 您可以在首页右上角下拉列表中创建组织</view>
+          <view style="margin-bottom: 12rpx;">● 如果组织已被创建，可以在下拉列表中点击加入组织</view>
+        </view>
+      </i-panel>
+      <view style="padding-top:200rpx;padding-bottom:20rpx;display:{{useWx?'block':'none'}}">
+        <i-button bind:getphonenumber="getPhoneNumber" type="success" openType="getPhoneNumber" shape="circle" size="small">
+          <view style="display:flex;justify-content: center;">
+            <view class="iconfont icon-wechat1" style="color: #fff;font-size:40rpx;;padding-left: 10rpx;"></view><text style="padding-left:10rpx">微信一键绑定</text>
+          </view>
+        </i-button>
+      </view>
+      <i-message id="message"></i-message>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import util from '@/utils/util.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class BindUserForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '完善信息',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index",
+        "i-button": "../../public/iview/button/index",
+        "i-icon": "../../public/iview/icon/index",
+        "i-panel": "../../public/iview/panel/index",
+      }
+    }
+    data = {
+      entry: {
+        op: 1,
+        mobile:'',
+        name:''
+      },
+      checkRules: {
+        required: [
+          "name", "mobile", "valicode"
+        ]
+      },
+      errMsgs: {},
+      vbTime: "获取验证码", //valicode button 内容
+      vbDisabled: false, //valicode button 是否禁止点击
+      currentTime: 61,
+      suffix: '',
+      useWx: false,
+      wxMobile: ''
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async getPhoneNumber(e) {
+        if (e.detail.errMsg == 'getPhoneNumber:ok') {
+          let encryptedData = e.detail.encryptedData
+          let iv = e.detail.iv
+          const data = await wxRequest.Get('getPhoneNumber', {
+            "encryptedData": encryptedData,
+            "iv": iv
+          })
+          if (data != undefined && data.code >= 1) {
+            if (data.message != undefined && data.message != '') {
+              tip.error(data.message)
+            }
+            let name = data.result.name
+            let mobile = data.result.phoneNumber
+            let bindData = await wxRequest.Get('sys/bindUser', {
+              "op": 1,
+              "name": name,
+              "mobile": mobile,
+              "useWx": true
+            })
+            if (bindData != undefined && bindData.code >= 1) {
+              Session.set('refresh', true)
+              tip.confirm('恭喜您，绑定成功！点击确定按钮返回主页，在首页右上角可创建新组织或选择加入已有组织，欢迎您的使用，谢谢！', {}, '操作提示', false).then(function(value) {
+                wepy.switchTab({
+                  url: '/pages/index'
+                })
+              }, function(error) {});
+            } else {
+              tip.error(bindData.message)
+            }
+          } else {
+            tip.error(data.message)
+          }
+        } else {
+          tip.confirm('未绑定，如果需要用其他手机号绑定，请点击确定', {}, '操作提示', true).then(function(value) {
+            console.log("操作提示用户点击确定:" + value)
+            //为绑定，转到绑定界面
+            wepy.navigateTo({
+              url: '/pages/user/bind_user_form?useWx=false'
+            })
+          }, function(error) {
+            console.log("操作提示用户点击取消:" + error)
+          });
+        }
+      },
+      async submit() {
+        //检查
+        if (this.entry.name != '' && this.entry.name != undefined && this.entry.name.length > 20) {
+          tip.error("姓名长度不能超过20个汉字！")
+          return
+        }
+        if (this.entry.mobile != '' && this.entry.mobile != undefined) {
+          if (this.entry.valicode == '' || this.entry.valicode == undefined) {
+            tip.error("如提交手机号，需输入手机验证码！")
+            return
+          }
+        }
+        if (this.entry.mobile == '' && this.entry.name == '') {
+          wepy.navigateTo({
+            url: '/pages/user/create_corp_form'
+          })
+        } else {
+          let bean = {}
+          for (let key in this.entry) {
+            bean[key] = this.entry[key]
+          }
+          let url = 'sys/bindUser'
+          let data = await wxRequest.Get(url, bean)
+          if (data != undefined && data.code >= 1) {
+            Session.set('refresh', true)
+            wepy.navigateTo({
+              url: '/pages/user/create_corp_form'
+            })
+          } else {
+            tip.confirm(data.message, {}, '错误提示', false)
+          }
+        }
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      this.$apply()
+    }
+    // 获取验证码
+    async getVerificationCode() {
+      if (this.vbDisabled) {
+        this.getCode();
+      }
+    }
+    async getSyncMsg() {
+      await wxRequest.Get('message/sync')
+    }
+    async getCode() {
+      let _this = this;
+      let mobile = _this.entry.mobile;
+      if (util.isMobile(mobile)) {
+        let url = 'sys/sendMobileCode'
+        let data = await wxRequest.Get(url, {
+          mobile: mobile
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          _this.vbDisabled = true
+          // 设置发送验证码按钮样式
+          let interval = null;
+          interval = setInterval(function() {
+            _this.currentTime--;
+            _this.vbTime = _this.currentTime
+            _this.suffix = '秒后可重新获取'
+            if (_this.currentTime <= 0) {
+              clearInterval(interval)
+              _this.vbTime = '重新发送'
+              _this.suffix = ''
+              _this.currentTime = 61
+              _this.vbDisabled = false
+            }
+            _this.$apply()
+          }, 1000)
+        } else {
+          tip.error(data.message)
+          _this.vbDisabled = false
+        }
+      } else {
+        tip.toast('请输入正确的手机号码。');
+      }
+    }
+  }
+</script>
+
+<style>
+  .btn {
+    color: red;
+    width: 150rpx;
+    height: 70rpx;
+    font-size: 24rpx;
+    padding: 0;
+    border: 1px solid red;
+    background: #fff;
+    border-radius: 4px;
+    margin: 15rpx 10rpx;
+    text-align: center;
+  }
+  .btn-selected {
+    border: 1px solid red;
+    color: white;
+    background: red;
+  }
+  .comment-btn {
+    display: flex;
+  }
+</style>
+
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

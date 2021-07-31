@@ -1,0 +1,244 @@
+<template>
+  <view class="container">
+    <view class="setting-container">
+      <i-cell-group>
+        <view style="text-align: center;font-size: 28rpx;padding: 30rpx 0;color: #f40;;display:{{isVersion == 1?'none':'block'}}">当前微信版本低，无法接收消息通知，建议升级微信</view>
+        <i-panel title="页面样式设置">
+          <i-cell title="首页图标悬浮" label="仅影响本地显示">
+            <i-switch value="{{ entry.iconTop }}" bind:change="setIconTop" slot="footer">
+            </i-switch>
+          </i-cell>
+          <i-cell style="display:{{userRole > 2?'none':'block'}}" title="更换组织封面" is-link url="/pages/settings/header" />
+        </i-panel>
+        <i-panel title="系统发送通知设置" style="display:{{userRole > 2?'none':'block'}}">
+          <i-cell title="发送微信通知" label="作用于当前组织">
+            <i-switch value="{{ entry.wxNotify }}" bind:change="setNotify('wxNotify')" slot="footer">
+            </i-switch>
+          </i-cell>
+          <i-cell title="发送APP通知" label="作用于当前组织，未安装APP无法收到通知">
+            <i-switch value="{{ entry.appNotify }}" bind:change="setNotify('appNotify')" slot="footer">
+            </i-switch>
+          </i-cell>
+        </i-panel>
+        <i-panel title="车辆审批设置" style="display:{{userRole > 2?'none':'block'}}">
+          <i-cell title="系统管理员可直接审批" label="设置是否可越过部门管理员直接审批">
+            <i-switch value="{{ entry.systemAudit }}" bind:change="setNotify('systemAudit')" slot="footer">
+            </i-switch>
+          </i-cell>
+        </i-panel>
+        <i-panel title="接收通知设置（为零，则无法收到相关通知）">
+          <i-cell title="约车通知" label="新申请通知、审批结果通知等">
+            <i-button @tap="subscribMsg('wx_tmpl_id_car_audit')" inline slot="footer" size="small">（{{tmplIds.wx_tmpl_id_car_audit.count}}）增加</i-button>
+          </i-cell>
+          <i-cell title="预约会议室通知" label="新申请通知、审批结果通知等">
+            <i-button bind:click="subscribMsg('wx_tmpl_id_audit')" inline slot="footer" size="small">（{{tmplIds.wx_tmpl_id_audit.count}}）增加</i-button>
+          </i-cell>
+          <i-cell title="公告通知" label="及时收到公告提醒">
+            <i-button bind:click="subscribMsg('wx_tmpl_id_unread')" inline slot="footer" size="small">（{{tmplIds.wx_tmpl_id_unread.count}}）增加</i-button>
+          </i-cell>
+          <i-cell title="留言通知" label="及时收到用户的留言提醒" style="display:{{companyId == 2?'block':'none'}}">
+            <i-button bind:click="subscribMsg('wx_tmpl_id_suggest')" inline slot="footer" size="small">（{{tmplIds.wx_tmpl_id_suggest.count}}）增加</i-button>
+          </i-cell>
+          <i-cell title="留言回复通知" label="及时收到您反馈、留言的回复提醒">
+            <i-button bind:click="subscribMsg('wx_tmpl_id_suggest_reply')" inline slot="footer" size="small">（{{tmplIds.wx_tmpl_id_suggest_reply.count}}）增加</i-button>
+          </i-cell>
+        </i-panel>
+      </i-cell-group>
+    </view>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import Session from '@/utils/session'
+  import util from '@/utils/util.js'
+  export default class HomeSetting extends wepy.page {
+    config = {
+      navigationBarTitleText: '参数设置',
+      "usingComponents": {
+        "i-cell-group": "../../public/iview/cell-group/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-panel": "../../public/iview/panel/index",
+        "i-switch": "../../public/iview/switch/index",
+        "i-button": "../../public/iview/button/index"
+      }
+    }
+    data = {
+      user: {
+        name: '访客'
+      },
+      entry: {
+        iconTop: false,
+        wxNotify: true,
+        appNotify: true,
+        smsNotify: false,
+        systemAudit: false
+      },
+      userRole: 6,
+      companyId: 0,
+      tmplIds: {},
+      isVersion: 0
+    }
+    computed = {}
+    onLoad() {
+      this.getUser()
+      this.entry.iconTop = Session.get('iconTop') == null ? true : (Session.get('iconTop') == 1 ? true : false)
+      this.entry.wxNotify = this.getOrgSetting("wxNotify")
+      this.entry.appNotify = this.getOrgSetting("appNotify")
+      this.entry.systemAudit = this.getOrgSetting("systemAudit")
+      this.userRole = Session.get("userRole")
+      let user = Session.get('user_load_cache')
+      this.companyId = user.companyId
+      let version = Session.get('wxVersion') || null
+      if (version != null) {
+        this.isVersion = util.cpVersion(version, '7.0.6')
+      }
+    }
+    onShow() {}
+    methods = {
+      redirect(url) {
+        wepy.navigateTo({
+          url: url
+        })
+      },
+      setIconTop(event) {
+        this.entry.iconTop = event.detail.value
+        Session.set('iconTop', event.detail.value ? 1 : 2)
+      },
+      setNotify(type, event) {
+        this.entry[type] = event.detail.value
+        this.saveOrgSetting(type, event.detail.value)
+      },
+      developing() {
+        wx.showToast({
+          title: '开发中，敬请期待',
+          icon: 'none'
+        });
+      },
+      async subscribMsg(key) {
+        if (this.isTest) {
+          return
+        }
+        let kv = key || null
+        if (kv == null) {
+          await tip.confirm('无法增加！可能您之前已选择拒绝收通知，请点击小程序上边三个点的按钮-->选择设置-->消息订阅-->打开接收订阅消息', {}, '操作提示', false)
+          return
+        }
+        let auditAlerted = Session.get("auditAlerted");
+        if (auditAlerted !== "true") {
+          await tip.confirm('尊敬的客户，稍后的消息订阅框，请您务必点击允许，并选择【总是保持以上选择】，以使本软件更好为您服务，谢谢！', {}, '新用户重要提示', false)
+          Session.set("auditAlerted", "true");
+        }
+        tip.loading("处理中...")
+        let subscribIds = []
+        let subscribKeys = {}
+        subscribIds.push(this.tmplIds[key].id)
+        subscribKeys[this.tmplIds[key].id] = key
+        new Promise((resolve, reject) => {
+          wx.requestSubscribeMessage({
+            tmplIds: subscribIds,
+            success: (res) => {
+              let acceptKeys = []
+              subscribIds.forEach(tmplId => {
+                if (res[tmplId] === 'accept') {
+                  acceptKeys.push(subscribKeys[tmplId])
+                }
+              })
+              resolve(acceptKeys)
+            },
+            fail(err) {
+              //失败
+              tip.loaded()
+              tip.confirm('增加通知数量失败！失败原因：' + err.errMsg, {}, '提示', false)
+              console.error(err);
+              reject()
+            }
+          })
+        }).then(res => {
+          this.updateTmplIds(res)
+        });
+      }
+    }
+    async getUserSetting(key) {
+      const data = await wxRequest.Get('setting/getUserSetting', {
+        key: key
+      })
+      if (data.code >= 1 && data.result != "") {
+        this.entry[key] = data.result
+        if (data.result == "true" || data.result == "false") {
+          this.entry[key] = data.result == "true" ? true : false
+        }
+        this.$apply()
+      }
+    }
+    async getOrgSetting(key) {
+      const data = await wxRequest.Get('setting/getOrgSetting', {
+        key: key
+      })
+      if (data.code >= 1 && data.result != "") {
+        this.entry[key] = data.result
+        if (data.result == "true" || data.result == "false") {
+          this.entry[key] = data.result == "true" ? true : false
+        } else {
+          if (key == "systemAudit") {
+            this.entry[key] = false
+          } else {
+            this.entry[key] = data.result
+          }
+        }
+      } else {
+        if (key == "systemAudit") {
+          this.entry[key] = false
+        }
+      }
+      this.$apply()
+    }
+    async saveUserSetting(key, value) {
+      const data = await wxRequest.Get('setting/saveUserSetting', {
+        key: key,
+        value: value
+      })
+    }
+    async saveOrgSetting(key, value) {
+      const data = await wxRequest.Get('setting/saveOrgSetting', {
+        key: key,
+        value: value
+      })
+    }
+    async getUser() {
+      let data = await wxRequest.Get('settings')
+      if (data != undefined && data.code >= 1) {
+        this.tmplIds = data.result.user.tmplIds
+      } else {
+        tip.error(data.message)
+      }
+      this.$apply()
+    }
+    async updateTmplIds(acceptKeys) {
+      let tmpKeyStr = ''
+      acceptKeys.forEach(key => {
+        tmpKeyStr = tmpKeyStr + key + ","
+      });
+      const data = await wxRequest.Get('updateTmplIds', {
+        tmplIds: tmpKeyStr
+      })
+      if (data.code >= 1) {
+        //页面增加，不再从服务器装载，减少调用
+        acceptKeys.forEach(key => {
+          this.tmplIds[key].count = this.tmplIds[key].count + 1
+        });
+        this.$apply()
+      } else {
+        if (data.message != '') {
+          tip.error(data.message)
+        }
+      }
+      tip.loaded()
+    }
+  }
+</script>
+<style lang="scss" src="../public/styles/setting.scss">
+
+</style>

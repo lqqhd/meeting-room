@@ -1,0 +1,295 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <input hidden name="id" value="{{ entry.id }}" />
+      <i-input id="destination" value="{{ entry.destination }}" title="目的地" placeholder="请填写目的地" maxlength="150" bind:change="bindChange" disabled="{{op != 'modify'}}" right errorMessage="{{errMsgs.destinationErrMsg}}" />
+      <i-input id="resion" value="{{ entry.resion }}" title="事由" placeholder="请填写事由" maxlength="200" bind:change="bindChange" disabled="{{op != 'modify'}}" right errorMessage="{{errMsgs.resionErrMsg}}" />
+      <picker id="members" bindchange="bindChange" value="{{entry.members}}" range="{{members_array}}" disabled="{{op != 'modify'}}">
+        <i-input value="{{ members_array[entry.members] }}人" title="乘车人数" placeholder="请选择乘车人数" disabled=true right rightIcon="enter" rightIconSize=18/>
+      </picker>
+      <i-input id="memberNames" value="{{ entry.memberNames }}" title="乘车人" placeholder="不填写默认申请人" maxlength="300" bind:change="bindChange" disabled="{{op != 'modify'}}" right errorMessage="{{errMsgs.memberNamesErrMsg}}" />
+      <picker id="startTime" mode="multiSelector" value="{{dtStartTime}}" bindchange="bindDateChange" range="{{dtStartTimeArray}}">
+        <i-input value="{{dtStartTimeArray[0][dtStartTime[0]]}}-{{dtStartTimeArray[1][dtStartTime[1]]}}-{{dtStartTimeArray[2][dtStartTime[2]]}} {{dtStartTimeArray[3][dtStartTime[3]]}}:{{dtStartTimeArray[4][dtStartTime[4]]}}" title="预约开始时间" placeholder="请选择开始时间"
+          disabled=true right rightIcon="activity" rightIconColor="#0095F2" />
+      </picker>
+      <picker id="endTime" mode="multiSelector" value="{{dtEndTime}}" bindchange="bindDateChange" range="{{dtEndTimeArray}}">
+        <i-input value="{{dtEndTimeArray[0][dtEndTime[0]]}}-{{dtEndTimeArray[1][dtEndTime[1]]}}-{{dtEndTimeArray[2][dtEndTime[2]]}} {{dtEndTimeArray[3][dtEndTime[3]]}}:{{dtEndTimeArray[4][dtEndTime[4]]}}" title="预约结束时间" placeholder="请选择结束时间" disabled=true right
+          rightIcon="activity" rightIconColor="#0095F2" />
+      </picker>
+      <view class="item" hidden="{{ entry.id == 0 || entry.id == undefined }}">
+        <view class="item-name">申请人</view>
+        <input value="{{ entry.userName }}" disabled="true" />
+      </view>
+      <i-input id="remark" value="{{ entry.remark }}" type="textarea" title="备注" placeholder="请输入备注" maxlength="50" bind:change="bindChange" disabled="{{op != 'modify'}}" />
+      <i-input id="rejectResion" hidden="{{entry.id == 0 || entry.id == undefined }}" value="{{ (entry.rejectResion == undefined ||entry.rejectResion == 'undefined' )?'':entry.rejectResion }}" type="textarea" title="驳回原因" placeholder="请填写驳回原因" maxlength="50"
+        bind:change="bindChange" disabled="{{op == 'modify'}}" />
+    </view>
+    <view class="btn-box">
+      <view wx:if="{{ op == 'modify' && entry.id != 0 && entry.id != undefined && userId == entry.user.id}}" class="biz-btn" @tap="del">取消预约</view>
+      <view wx:if="{{ op == 'modify' &&(entry.id == 0 || entry.id == undefined || userId == entry.user.id) }}" class="biz-btn save" @tap="submit">{{entry.id == 0 || entry.id == undefined?"提交预约":"修改预约"}}</view>
+      <view wx:if="{{ op == 'audit' }}" class="biz-btn save" @tap="reject">驳回</view>
+      <view wx:if="{{ op == 'audit' && auditRole }}" class="biz-btn save" @tap="agree">审核通过</view>
+      <view wx:if="{{ op == 'audit' && assignRole }}" class="biz-btn save {{entry.status != 'AGREE'?'btn-disabled':''}}" @tap="assign">{{entry.carNum == undefined || entry.carNum == ''?'分配车辆':'重新分配'}}</view>
+      <view wx:if="{{op == 'cancelAssign' }}" class="biz-btn save" @tap="goBack">关闭</view>
+      <view wx:if="{{op == 'cancelAssign' }}" class="biz-btn save" @tap="unAssign">取消分配</view>
+    </view>
+    <i-message id="message" />
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import Host from '@/utils/host'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class CarBookForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '车辆预约',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index"
+      }
+    }
+    data = {
+      entry: {},
+      checkRules: {
+        required: ['destination', 'resion']
+      },
+      errMsgs: {},
+      members_array: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+      op: "modify", //哪种操作{modify:新建、修改,audit:审核,cancelAssign:取消分配}
+      auditRole: false, //是否有审核权限
+      assignRole: false, //是否有分配权限
+      dtStartTimeArray: null, //datetime用
+      dtStartTime: null, //datetime用     
+      dtEndTimeArray: null, //datetime用
+      dtEndTime: null, //datetime用
+      userId: 0
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      bindDateChange(e) {
+        let dt = 'dt' + e.currentTarget.id.substring(0, 1).toUpperCase() + e.currentTarget.id.substring(1)
+        this[dt] = e.detail.value
+        this.entry[e.currentTarget.id] = dateTimePicker.getDateStr(e.detail.value, this[dt + 'Array'])
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async del() {
+        await tip.confirm('确认取消此车辆的预约吗！', {}, '提示')
+        const data = await wxRequest.Get(`daguanjia/unsubscribeCar/`, {
+          carBookId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async submit() {
+        let cId = this.entry.id
+        let url = 'daguanjia/modifyCarBook'
+        if (this.entry.id == 0 || this.entry.id == undefined) {
+          url = 'daguanjia/subscribeCar'
+        }
+        //检查必填
+        let checked = true
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        // if (this.entry.destination == '' || this.entry.destination == undefined) {
+        //   tip.error('未填写目的地')
+        //   return false
+        // }
+        // if (this.entry.members == '' || this.entry.members == undefined) {
+        //   tip.error('未填写人数')
+        //   return false
+        // }
+        // if (this.entry.resion == '' || this.entry.resion == undefined) {
+        //   tip.error('未填写事由')
+        //   return false
+        // }
+        let bean = {}
+        for (let key in this.entry) {
+          bean[key] = this.entry[key]
+        }
+        bean.startTime = this.entry.startTime
+        bean.endTime = this.entry.endTime
+        bean.carBookId = this.entry.id
+        delete bean.user
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async agree() {
+        if (this.entry.carNum != undefined && this.entry.carNum != null && this.entry.carNum != '') {
+          tip.confirm('已分配车辆，不能再进行审核通过操作！', {}, '提示', false)
+          return
+        }
+        const data = await wxRequest.Get(`daguanjia/carAgree/`, {
+          carBookId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            // tip.error(data.message)
+            $Message({
+              content: data.message,
+              type: 'success',
+              duration: 3
+            });
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async reject() {
+        if (this.entry.carNum != undefined && this.entry.carNum != null && this.entry.carNum != '') {
+          await tip.confirm('已分配车辆，不能再进行驳回操作！请联系管理员取消分派后再进行此操作！', {}, '提示', false)
+          return
+        }
+        await tip.confirm('确认驳回此车辆的预约吗！', {}, '提示')
+        const data = await wxRequest.Get(`daguanjia/carReject/`, {
+          carBookId: this.entry.id,
+          rejectResion: this.entry.rejectResion
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            // tip.error(data.message)
+            $Message({
+              content: data.message,
+              type: 'warning'
+            });
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      assign() {
+        if (this.entry.status != 'AGREE') {
+          tip.confirm('只有审核同意后，才可以分配车辆！请通知部门管理员审核，或在首页设置中打开【系统管理员可直接审核】选项', {}, '操作提示', false)
+          return
+        }
+        wx.navigateTo({
+          url: `/pages/carbook/car_apply?id=${this.entry.id}&startTime=${this.entry.startTime}&endTime=${this.entry.endTime}&destination=${this.entry.destination}&members=${this.entry.members}&carNum=${this.entry.carNum}`
+        })
+      },
+      async unAssign() {
+        const data = await wxRequest.Get(`daguanjia/carUnAssign/`, {
+          carBookId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    computed = {
+      host() {
+        return Host.host;
+      }
+    }
+    onLoad(options) {
+      let user = Session.get('user_load_cache')
+      this.userId = user.id
+      if (options.id == undefined) {
+        this.entry.members = 2
+        this.entry.startTime = dateUtil.formatDate(new Date(), "-") + " " + dateUtil.addZero(new Date().getHours()) + ":00"
+        this.entry.endTime = dateUtil.formatDate(new Date(), "-") + " " + dateUtil.addZero(new Date().getHours() + 1) + ":00"
+        // 初始化开始时间
+        var objStartTime = dateTimePicker.dateTimePicker(2000, 2050, this.entry.startTime)
+        objStartTime.dateTime.pop()
+        objStartTime.dateTimeArray.pop()
+        this.dtStartTime = objStartTime.dateTime
+        this.dtStartTimeArray = objStartTime.dateTimeArray
+        //初始化结束时间
+        var objEndTime = dateTimePicker.dateTimePicker(2000, 2050, this.entry.endTime)
+        objEndTime.dateTime.pop()
+        objEndTime.dateTimeArray.pop()
+        this.dtEndTime = objEndTime.dateTime
+        this.dtEndTimeArray = objEndTime.dateTimeArray
+      } else {
+        this.getBook(options.id)
+      }
+      this.op = options.op
+    }
+    async getBook(id) {
+      const data = await wxRequest.Get('daguanjia/getCarBook', {
+        carBookId: id
+      })
+      if (data != undefined && data.code >= 1) {
+        let entry = data.result
+        this.entry.carBookId = entry.id
+        this.entry = entry
+        this.entry.userName = entry.deptName + "-" + entry.user.name
+        this.entry.rejectResion = entry.rejectResion == undefined ? '' : entry.rejectResion
+        this.auditRole = data.salt.auditRole
+        this.assignRole = data.salt.assignRole
+        // 初始化开始时间
+        var objStartTime = dateTimePicker.dateTimePicker(2000, 2050, this.entry.startTime)
+        objStartTime.dateTime.pop()
+        objStartTime.dateTimeArray.pop()
+        this.dtStartTime = objStartTime.dateTime
+        this.dtStartTimeArray = objStartTime.dateTimeArray
+        //初始化结束时间
+        var objEndTime = dateTimePicker.dateTimePicker(2000, 2050, this.entry.endTime)
+        objEndTime.dateTime.pop()
+        objEndTime.dateTimeArray.pop()
+        this.dtEndTime = objEndTime.dateTime
+        this.dtEndTimeArray = objEndTime.dateTimeArray
+      } else {
+        tip.error(data.message)
+      }
+      this.$apply()
+    }
+  }
+</script>
+<style lang="scss" src="@/public/styles/common_form.scss"/>

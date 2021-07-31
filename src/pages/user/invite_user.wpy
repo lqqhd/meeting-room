@@ -1,0 +1,97 @@
+<template>
+  <view class="container">
+    <view style="padding: 20rpx 0;text-align: center;font-size: 46rpx;font-weight:777">
+      加入{{deptName}}
+    </view>
+    <view style="padding: 20rpx 30rpx;color: #777;font-size: 42rpx;">
+        <view style="margin-bottom: 12rpx;color:red"><text style="font-size:18rpx;" space="ensp">● </text> 可分享到企业或部门微信群内</view>
+        <view style="margin-bottom: 12rpx;color:red"><text style="font-size:18rpx;" space="ensp">● </text> 员工点击邀请可直接加入本部门</view>
+        <view style="margin-bottom: 12rpx;color:red"><text style="font-size:18rpx" space="ensp">● </text> 点击邀请后请务必同意授权</view>
+       
+        <!-- <view style="margin-bottom: 12rpx;"><text style="font-size:18rpx">●</text> 由于有客户退款情况，因此有30天账期，30天后即可结算</view> -->
+        <view style="height:320rpx;width:100%"></view>
+      </view>
+    <input hidden name="id" value="{{ entry.id }}" />
+    <button type="primary" open-type="share" style="width: 92%;font-size: 34rpx;height: 86rpx;line-height: 86rpx;"><view style="display:flex;justify-content: center;">
+              <text>开始邀请</text></view>
+            </button>
+            <button type="primary" @tap="goInvikeJoin" style="display:none;width: 92%;font-size: 34rpx;height: 86rpx;line-height: 86rpx;"><view style="display:flex;justify-content: center;">
+              <text>接受邀请界面</text></view>
+            </button>
+    <i-message id="message"></i-message>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class JoinCorpForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '邀请用户',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index",
+        "i-panel": "../../public/iview/panel/index",
+        "i-radio-group": "../../public/iview/radio-group/index",
+        "i-radio": "../../public/iview/radio/index"
+      }
+    }
+    data = {
+      deptName: '',
+      deptId:'',
+      userName:'',
+      companyName:'',
+      inviteCode:'',
+      companyId:''
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      goInvikeJoin(e) {
+        let target = '/pages/user/invite_join?companyId=' + this.companyId+"&companyName="+this.companyName+"&deptId="+this.deptId+"&deptName="+this.deptName+"&userName="+this.userName
+        wx.navigateTo({
+          url: target
+        })
+      },
+      handleClick(e) {
+        this.current = e.detail.value
+        this.errMsgs.codeErrMsg = '';
+        this.errMsgs.nameErrMsg = '';
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if (options.id == undefined) {} else {
+        this.deptId = Session.get("sysOffice-for-modify").id
+        this.deptName = Session.get("sysOffice-for-modify").name
+        this.inviteCode = Session.get("sysOffice-for-modify").inviteCode
+        Session.clear("sysOffice-for-modify")
+      }
+      this.userName = Session.get('user_load_cache').name
+      this.companyName = Session.get('user_load_cache').companyName
+      this.companyId = Session.get('user_load_cache').companyId
+    }
+    onShareAppMessage(ops) {
+      let title = this.userName+'邀您加入'+this.companyName+'-'+this.deptName+'！'
+      let target = '/pages/user/invite_join?companyId=' + this.companyId+"&companyName="+this.companyName+"&deptId="+this.deptId+"&deptName="+this.deptName+"&userName="+this.userName
+      return {
+        title: title,
+        path: target,
+        success: async function(res) {
+        }
+      }
+    }
+  }
+</script>
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

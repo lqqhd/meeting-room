@@ -1,0 +1,818 @@
+<template>
+  <view class="container">    
+    <i-message id="message"></i-message>
+    <view class="header">
+      <!--通知栏区-->
+      <repeat for="{{ syncMsgList }}" key="k" index="v" item="syncMsg" wx:if="{{ syncMsgList.length > 0 }}">
+        <i-notice-bar icon="systemprompt" loop closable speed="1500">
+          <navigator wx:if="{{ syncMsg.url }}" url="{{ syncMsg.url }}">
+            <text>{{ syncMsg.title }}</text>
+          </navigator>
+          <text wx:else>{{ syncMsg.title }}</text>
+        </i-notice-bar>
+      </repeat>
+      <!--引导功能区-->
+      <view style="display: flex;justify-content:  space-between;height: 62rpx;font-size: 28rpx;line-height: 62rpx;padding: 0 15rpx;">
+        <view></view>
+        <view style="display: flex;" @tap="openOrgView">
+          <view style="margin-right: 10rpx;font-size: 26rpx;">{{companyName}}</view>
+          <i-icon type="unfold" size="18" color="#80848f" padding="0 0 10rpx 0"></i-icon>
+        </view>
+      </view>
+      <i-modal title="切换、加入或创建组织" visible="{{ orgView }}" actions="{{ orgList }}" action-mode="{{ vertical }}" bind:click="orgOperate" bind:getuserinfo="login" />
+      <!--演示用户区-->
+      <view hidden="{{!isTest}}">
+        <button open-type="getUserInfo" bindgetuserinfo="login" style="background-color:#fff;border-radius: 0;padding: 0;line-height: 100%;"><image class="background-img" style="z-index:0" mode="scaleToFill" src="https://yzimg.jikebang.com/oa/mp-banner.png" />
+                </button>
+      </view>
+      <!--封面图片区-->
+      <view hidden="{{isTest}}" class="header">
+        <image class="background-img" mode="scaleToFill" src="{{bannerUrl}}" />
+        <view class="level-2" style="display:{{userRole > 2?'none':'block'}}">
+          <view class="overflow-hide">
+            <view class="pull-left fs14"></view>
+            <view @tap="redirect('/pages/settings/header')" class="pull-right cover-title">更换封面</view>
+          </view>
+        </view>
+      </view>
+      <!--管理员功能列表区-->
+      <view class="pannel-header" style="display:{{userRole > 2?'none':'flex'}}">
+        <view class="pannel-title">
+          <view class="title">管理员控制台 {{user.companyId}}</view>
+          <view class="sub-title"> ( 仅管理员可见 ) </view>
+        </view>
+        <view class="right-title" @tap="redirect2('/pages/settings/home_setting')">设置</view>
+        <button class="get-user-btn" open-type="getPhoneNumber" bindgetphonenumber="getPhoneNumber" style="display:none">手机号</button>
+      </view>
+      <view class="pannel-content" style="display:{{userRole > 2?'none':'flex'}}">
+        <view @tap="redirect('/pages/sysOffice/sysOffice_list')">
+          <view>
+            <image src="../public/images/nav_org.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">组织架构</view>
+        </view>
+        <view @tap="redirect('/pages/boardroom/boardroom_list')">
+          <view>
+            <image src="../public/images/nav_boardroom_setting.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">会议室管理</view>
+        </view>
+        <view @tap="redirect('/pages/car/car_list')">
+          <view>
+            <image src="../public/images/nav_car_setting.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">车辆管理</view>
+        </view>
+        <view @tap="redirect('/pages/rota/rota')">
+          <view>
+            <image src="../public/images/nav_rota_setting.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">值班表管理</view>
+        </view>
+      </view>
+      <!--普通导航功能列表区-->
+      <view class="pannel-header" @tap="openClose()">
+        <view class="pannel-title">
+          <view class="title">日常工作</view>
+          <view class="sub-title"></view>
+        </view>
+        <view class="right-more">{{openClose}}</view>
+      </view>
+      <view class="pannel-content">
+        <view @tap="switchTab('/pages/boardroom_apply')">
+          <view>
+            <image src="../public/images/nav_boardroom2.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">会议室预约</view>
+        </view>
+        <view @tap="switchTab('/pages/carbook/carbook_list')">
+          <view>
+            <image src="../public/images/nav_car_apply.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">车辆预约</view>
+        </view>
+        <view @tap="redirect('/pages/rota/rota_list')">
+          <view>
+            <image src="../public/images/nav_rota2.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">值班表</view>
+        </view>
+        <view @tap="switchTab('/pages/phonebook')">
+          <view>
+            <image src="../public/images/nav_phonebook2.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">通讯录</view>
+        </view>
+      </view>
+      <view class="pannel-content" style="display:{{openClose == '展开'?'none':'flex'}}">
+        <view @tap="redirect('/pages/audit/audit?current=0')" style="{{userRole > 4?'display:none':''}}">
+          <view>
+            <i-badge count="{{bizStat.roomNum}}">
+              <image src="../public/images/nav_boardroom_audit.png" class="{{iconTop?'icon-top':''}}" />
+            </i-badge>
+          </view>
+          <view class="fun-txt">会议室审批</view>
+        </view>
+        <view @tap="redirect('/pages/audit/audit?current=1')" style="{{userRole > 4?'display:none':''}}">
+          <view>
+            <i-badge count="{{bizStat.carNum}}">
+              <image src="../public/images/nav_car_audit.png" class="{{iconTop?'icon-top':''}}" />
+            </i-badge>
+          </view>
+          <view class="fun-txt">车辆审批</view>
+        </view>
+        <view @tap="redirect('/pages/publish/publish_list')">
+          <view>
+            <i-badge count="{{bizStat.publish}}">
+              <image src="../public/images/nav_publish2.png" class="{{iconTop?'icon-top':''}}" />
+            </i-badge>
+          </view>
+          <view class="fun-txt">公告</view>
+        </view>
+        <view @tap="redirect('/pages/message')" style="display:none">
+          <view>
+            <i-badge count="{{bizStat.noRead}}">
+              <image src="../public/images/nav_message2.png" class="{{iconTop?'icon-top':''}}" />
+            </i-badge>
+          </view>
+          <view class="fun-txt">我的消息</view>
+        </view>
+        <view @tap="redirect('/pages/settings/home_setting')">
+          <view>
+            <image src="../public/images/nav_setting2.png" class="{{iconTop?'icon-top':''}}" />
+          </view>
+          <view class="fun-txt">设置</view>
+        </view>
+        <view style="{{userRole < 6?'display:none':''}}">
+          <view>
+            <image src="" class="" />
+          </view>
+          <view class="fun-txt"></view>
+        </view>
+        <view style="{{userRole < 6?'display:none':''}}">
+          <view>
+            <image src="" class="" />
+          </view>
+          <view class="fun-txt"></view>
+        </view>
+      </view>
+      <!--公告消息区-->
+      <view class="pannel-header" @tap="redirect('/pages/publish/publish_list')" style="margin-bottom:8px;">
+        <view class="pannel-title">
+          <view class="title">公告消息 </view>
+          <view class="sub-title"></view>
+        </view>
+        <view class="right-more">更多</view>
+      </view>
+      <view class="tweet-list" wx:if="{{ tweetList.length > 0 }}">
+        <repeat for="{{ tweetList }}" key="k" index="idx" item="tweet">
+          <view class="row" @tap="goDetail('{{idx}}','{{ tweet }}')">
+            <view class="user-info">
+              <view class="icon">
+                <image src="{{ tweet.user.avatar }}" />
+              </view>
+              <view class="title">{{tweet.user.name}}</view>
+            </view>
+            <view class="information">
+              <view class="st-title" style="justify-content: flex-start;">
+                <view style="display:{{tweet.isRead == 0?'none':'flex'}};font-size: 20rpx;color: #428bca;padding-right: 30rpx;">●</view>
+                <view class="title" style="color:#{{tweet.isRead == 0?'999':'212121'}}">{{ tweet.content }}</view>
+              </view>
+            </view>
+            <view class="information">
+              <view class="st-bottom">
+                <view class="description">
+                  <i-icon type="time" size="18" color="#80848f"></i-icon>
+                  <view style="margin-top:3rpx;">{{ tweet.pubDate }}</view>
+                </view>
+                <view class="description" style="display:none">
+                  <i-icon type="message" size="18" color="#80848f"></i-icon>
+                  <view style="margin-top:3rpx;">{{ tweet.commentCount }}</view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </repeat>
+      </view>
+      <view class="pannel-header" @tap="redirect('/pages/settings/role_info')" style="padding:14rpx 40rpx 18rpx 40rpx;display:flex;justify-content:space-between;">
+        <view>角色说明</view> <view style="font-size: 50rpx;color: #aaa;">›</view>
+      </view> 
+      <!--直接联系客服区-->
+      <view class="pannel-header" open-type="contact" style="padding-bottom:0px;padding-top:0px;padding-right: 15rpx;border-bottom:10px solid #f1f1f1;">
+        <button type="primary" open-type="contact" style="color:#888;width: 100%;font-size: 28rpx;height: 86rpx;line-height: 86rpx;background:#fff"><view style="display:flex;justify-content: center;">
+                <text>联系客服（建议、问题、合作事宜）</text></view>
+              </button>
+      </view>      
+      <official-account style=""></official-account>
+    </view>
+    <i-action-sheet visible="{{ visible1 }}" actions="{{ actions1 }}" show-cancel bind:cancel="handleCancel1" bind:click="handleClickItem" />
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import Session from '@/utils/session'
+  import Empty from '@/components/empty'
+  import StatementItem from '@/components/index/statement'
+  import {
+    getStore
+  } from 'wepy-redux'
+  import {
+    asyncList
+  } from '@/store/actions'
+  import tip from '@/utils/tip'
+  import Util from '@/utils/util.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class Index extends wepy.page {
+    config = {
+      navigationBarTitleText: '首页',
+      enablePullDownRefresh: true,
+      navigationBarBackgroundColor: '#1976D2',
+      backgroundTextStyle: "dark",
+      backgroundColor: '#efefef',
+      "usingComponents": {
+        "i-message": "../public/iview/message/index",
+        "i-notice-bar": "../public/iview/notice-bar/index",
+        "i-icon": "../public/iview/icon/index",
+        "i-badge": "../public/iview/badge/index",
+        "i-modal": "../public/iview/modal/index",
+        "i-button": "../public/iview/button/index",
+        'i-action-sheet': '../public/iview/action-sheet/index'
+      }
+    }
+    data = {
+      companyName: '', //激活的公司
+      companyId: 0, //激活的公司ID
+      list: [],
+      tmplIds: {}, //需用户订阅的模版消息ID
+      syncMsgList: {},
+      tweetList: [],
+      orgList: [],
+      orgListInit: [{
+          name: '创建新组织',
+          icon: 'add',
+          type: 'add'
+        },
+        {
+          name: '加 入 组 织',
+          icon: 'play',
+          type: 'join'
+        },
+        {
+          name: '微信一键登录',
+          icon: 'user',
+          type: 'login',
+          openType: ''
+        },
+        {
+          name: '关闭',
+          type: 'close'
+        }
+      ],
+      orgView: false,
+      userRole: 6,
+      isTest: false,
+      bizStat: {
+        carNum: 0,
+        roomNum: 0,
+        noRead: 0,
+        publish: 0
+      },
+      bannerUrl: '',
+      openClose: '收起',
+      iconTop: true,
+      msgAfter: true,
+      actions1: [],
+      visible1: false
+    }
+    components = {
+      empty: Empty,
+      orderEmpty: Empty,
+      StatementItem
+    }
+    onLoad(options) {
+      this.getUser()
+      if (options != undefined && (options.fromUser || null) != null) {
+        Session.set('fromUser', options.fromUser)
+      }
+    }
+    onShow() {
+      this.visible1 = false
+      //如果重新登录或公司切换成功，则需要刷新此页面
+      if (Session.get('page-0') || Session.get('refresh')) {
+        this.onLoad()
+        Session.set('page-0', false)
+        Session.set('refresh', false)
+      }
+      this.iconTop = Session.get('iconTop') == null ? true : (Session.get('iconTop') == 1 ? true : false)
+    }
+    onPullDownRefresh() {
+      this.onLoad()
+    }
+    methods = {
+      redirect(url) {
+        if (this.companyId == 1) {
+          this.openAction()
+        } else {
+          this.subscribMsg(url)
+          if (!this.msgAfter) {
+            wepy.navigateTo({
+              url: url
+            })
+          }
+        }
+      },
+      redirect2(url) {
+        wepy.navigateTo({
+          url: url
+        })
+      },
+      switchTab(url) {
+        if (this.companyId == 1) {
+          this.openAction()
+        } else {
+          wepy.switchTab({
+            url: url
+          })
+        }
+      },
+      orgOperate(val) {
+        let idx = val.detail.index
+        let item = this.orgList[idx]
+        let user = Session.get('user_load_cache')
+        switch (item.type) {
+          case 'add':
+            if (!user.isLogin) {
+              tip.confirm('请点击本列表中的【微信一键登录】按钮，请您务必同意授权，授权成功后，即可正式使用本系统，谢谢！', {}, '操作提示', false)
+              return
+            }
+            wepy.navigateTo({
+              url: '/pages/user/create_corp_form'
+            })
+            break
+          case 'login':
+            break
+          case 'logout':
+            this.logout()
+            break
+          case 'join':
+            if (!user.isLogin) {
+              tip.confirm('请点击本列表中的【微信一键登录】按钮，请您务必同意授权，授权成功后，即可正式使用本系统，谢谢！', {}, '操作提示', false)
+              return
+            }
+            wepy.navigateTo({
+              url: '/pages/user/join_corp_form'
+            })
+            break
+          case 'close':
+            break
+          case 'change':
+            let companyId = item.id
+            let companyName = item.name
+            this.changeCompany(companyId, companyName)
+            break
+        }
+        this.orgView = false
+      },
+      openOrgView(detail) {
+        this.orgView = true
+      },
+      openClose() {
+        if (this.openClose == '收起') {
+          this.openClose = '展开'
+        } else {
+          this.openClose = '收起'
+        }
+        this.$apply()
+      },
+      async login(e) {
+        if (e.detail.errMsg != 'getUserInfo:ok') {
+          tip.confirm('您未授权，登录失败！请您务必同意授权，授权成功后，即可正式使用本系统，谢谢！', {}, '操作提示', false)
+          return false
+        }
+        let userInfo = e.detail.userInfo
+        let fromUser = Session.get('fromUser')
+        if ((fromUser || null) != null) {
+          userInfo["fromUser"] = fromUser
+        }
+        const data = await wxRequest.Get('wx-login', userInfo)
+        if (data.result.bind) {
+          this.onLoad()
+          //通知Tab页面需要刷新
+          for (let index = 0; index < 5; index++) {
+            Session.set('page-' + index, true)
+          }
+          this.$apply()
+        } else {
+          this.bingUser()
+        }
+      },
+      async getPhoneNumber(e) {
+        if (e.detail.errMsg == 'getPhoneNumber:ok') {
+          let encryptedData = e.detail.encryptedData
+          let iv = e.detail.iv
+          const data = await wxRequest.Get('getPhoneNumber', {
+            "encryptedData": encryptedData,
+            "iv": iv
+          })
+          if (data != undefined && data.code >= 1) {
+            if (data.message != undefined && data.message != '') {
+              tip.error(data.message)
+            }
+            Session.set('wxNickname', data.result.name)
+            Session.set('wxMobile', data.result.phoneNumber)
+          } else {
+            tip.error(data.message)
+          }
+        } else {
+          Session.set('wxNickname', "")
+          Session.set('wxMobile', "")
+        }
+        //为绑定，转到绑定界面
+        wepy.navigateTo({
+          url: '/pages/user/bind_user_form'
+        })
+      },
+      async set(e) {
+        this.subscribMsg()
+      },
+      joinCorp() {
+        if (!this.user.isLogin) {
+          tip.confirm('请点击右上角列表中的【微信一键登录】按钮，请您务必同意授权，授权成功后，即可正式使用本系统，谢谢！', {}, '操作提示', false)
+          return
+        }
+        wepy.navigateTo({
+          url: '/pages/user/join_corp_form'
+        })
+      },
+      goDetail(idx, item) {
+        Session.set('publish-for-modify', item)
+        wx.navigateTo({
+          url: `/pages/publish/publish_detail?id=${item.id}&isRead=${this.tweetList[idx].isRead}`
+        })
+        this.tweetList[idx].isRead = 0
+        this.$apply()
+      },
+      handleCancel1() {
+        this.visible1 = false
+      },
+      handleClickItem({
+        detail
+      }) {
+        if (detail.index == 1) { //创建新组织         
+          wepy.navigateTo({
+            url: '/pages/user/create_corp_form'
+          })
+        } else if (detail.index == 2) { //加入现组织
+          wepy.navigateTo({
+            url: '/pages/user/join_corp_form'
+          })
+        } else if (detail.index == 3) { //合伙人计划
+          if (this.user.isAgent) {
+            wepy.navigateTo({
+              url: "/pages/agent/index"
+            })
+          } else {
+            wepy.navigateTo({
+              url: '/pages/user/bind_user_form'
+            })
+          }
+        } else if (detail.index == 4) { //完善信息          
+          wepy.navigateTo({
+            url: '/pages/user/bind_user_form'
+          })
+        }
+      }
+    }
+    async getSyncMsg() {
+      const data = await wxRequest.Get('message/sync')
+      if (data === undefined) {
+        return false
+      }
+      this.syncMsgList = data.result
+      this.$apply()
+    }
+    async getTweet() {
+      const data = await wxRequest.Get('tweet/list', {
+        type: '7'
+      })
+      if (data === undefined) {
+        return false
+      }
+      let count = (data.result == undefined || data.result.items == undefined) ? 0 : data.result.items.length
+      if (count > 3) {
+        count = 3
+      }
+      this.tweetList = []
+      for (var i = 0; i < count; i++) {
+        let tweet = data.result.items[i];
+        tweet.pubDate = Util.getDateDiff(tweet.pubDate)
+        tweet.content = tweet.content.length > 100 ? tweet.content.substring(0, 100) + ' ...' : tweet.content
+        this.tweetList.push(tweet)
+      }
+      this.$apply()
+    }
+    async getUser() {
+      let data = await wxRequest.Get('settings')
+      if (data != undefined && data.code >= 1) {
+        Session.set('user_load_cache', data.result.user)
+        this.user = data.result.user
+        this.companyName = this.user.companyName
+        this.companyId = this.user.companyId
+        this.tmplIds = this.user.tmplIds
+        Session.set("tmplIds", this.tmplIds)
+        if (this.user.roles.indexOf(6) > -1) {
+          this.userRole = 6
+        }
+        if (this.user.roles.indexOf(4) > -1) {
+          this.userRole = 4
+        }
+        if (this.user.roles.indexOf(2) > -1) {
+          this.userRole = 2
+        }
+        if (this.user.companyId == 3) {
+          this.isTest = true
+        } else {
+          this.isTest = false
+        }
+        if (this.user.companyId == 1) {
+          this.userRole = 2
+        }
+        Session.set("userRole", this.userRole)
+        this.getMyCompany()
+        this.getSyncMsg()
+        this.getTweet()
+        this.getBizStat()
+        this.getBanner()
+        if (this.tmplIds.wx_tmpl_id_audit.count > 10 || this.tmplIds.wx_tmpl_id_car_audit.count > 10 || this.tmplIds.wx_tmpl_id_unread.count > 10) {
+          this.msgAfter = false
+        }
+        this.updateSystemInfo(this.user.deviceModel)
+      } else {
+        tip.error(data.message)
+      }
+      this.$apply()
+    }
+    async updateSystemInfo(dbDeviceModel) {
+      wx.getSystemInfo({
+        success(res) {
+          let model = res.model
+          let version = res.version
+          Session.set('system', res.system)
+          Session.set('wxVersion', res.version)
+          let deviceModel = model + "_" + version
+          if (deviceModel !== dbDeviceModel) {
+            const data = wxRequest.Get('updateSystemInfo', {
+              info: res
+            })
+            if (data.code >= 1) {}
+            console.log(res)
+          }
+        }
+      })
+    }
+    async getBizStat() {
+      let data = await wxRequest.Get('bizStat')
+      if (data.result) {
+        this.bizStat.carNum = data.result.carNum
+        this.bizStat.roomNum = data.result.roomNum
+        this.bizStat.publish = data.result.publish
+      }
+      this.$apply()
+    }
+    //获取我加入的公司列表
+    async getMyCompany() {
+      const data = await wxRequest.Get('employee/listMyCompany')
+      if (data === undefined) {
+        return false
+      }
+      this.orgList = [].concat(this.orgListInit)
+      let cnt = data.result == undefined ? 0 : data.result.length
+      for (let i = 0; i < cnt; i++) {
+        const item = data.result[i]
+        if (item.companyId == 1) {
+          continue
+        }
+        let org = {
+          id: item.companyId,
+          name: item.companyName + (item.status == "AGREE" ? "" : "（待审核）"),
+          color: item.companyId == this.companyId ? '#228B22' : '#444',
+          type: 'change'
+        }
+        this.orgList.unshift(org)
+      }
+      //根据登录状态调整是登录还是注销
+      let user = Session.get('user_load_cache')
+      //console.log("用户信息："+JSON.stringify(user))
+      let loginIdx = this.orgList.length - 2
+      if (user != undefined && user.isLogin) {
+        this.orgList[loginIdx].name = '退出登录'
+        this.orgList[loginIdx].type = 'logout'
+        this.orgList[loginIdx].openType = ''
+      } else {
+        this.orgList[loginIdx].name = '微信一键登录'
+        this.orgList[loginIdx].type = 'login'
+        this.orgList[loginIdx].openType = 'getUserInfo'
+      }
+      this.$apply()
+    }
+    //切换组织
+    async changeCompany(companyId, companyName) {
+      if (companyId == this.companyId) {
+        return
+      }
+      const data = await wxRequest.Get('sys/changeCompany', {
+        companyId: companyId
+      });
+      if (data === undefined) {
+        return false
+      }
+      if (data.code >= 1) {
+        this.companyId = companyId
+        this.companyName = companyName
+        //通知Tab页面需要刷新
+        for (let index = 0; index < 5; index++) {
+          Session.set('page-' + index, true)
+        }
+        this.onLoad()
+        this.$apply()
+      } else {
+        if (data.message != undefined && data.message != '') {
+          $Message({
+            content: data.message,
+            type: 'error',
+            duration: 3
+          });
+        }
+      }
+    }
+    async logout() {
+      await tip.confirm('退出登录后，系统进入演示模式', {}, '确认退出登录？')
+      const data = await wxRequest.Put('wx-logout')
+      if (data.code >= 1) {
+        this.getSyncMsg()
+        let _this = this
+        setTimeout(function() {
+          _this.onLoad()
+        }, 200)
+        //通知Tab页面需要刷新
+        for (let index = 0; index < 5; index++) {
+          Session.set('page-' + index, true)
+        }
+      } else {
+        if (data.message != undefined && data.message != '') {
+          $Message({
+            content: data.message,
+            type: 'error',
+            duration: 3
+          });
+        }
+      }
+    }
+    async subscribMsg(url) {
+      let _this = this
+      if (this.isTest) {
+        if (this.msgAfter) {
+          wepy.navigateTo({
+            url: url
+          })
+        }
+        return
+      }
+      let auditAlerted = Session.get("auditAlerted");
+      if (auditAlerted !== "true") {
+        await tip.confirm('尊敬的客户，稍后的消息订阅框，请您务必点击允许，并选择【总是保持以上选择】，以使本软件更好为您服务，谢谢！', {}, '新用户重要提示', false)
+        Session.set("auditAlerted", "true");
+      }
+      if (this.tmplIds == null) {
+        if (this.msgAfter) {
+          wepy.navigateTo({
+            url: url
+          })
+        }
+        return
+      }
+      let subscribIds = []
+      let subscribKeys = {}
+      //if (url.indexOf("boardroom") != -1 || url.indexOf("car") != -1 || url.indexOf("audit") != -1) {
+      subscribIds.push(this.tmplIds.wx_tmpl_id_audit.id)
+      subscribKeys[this.tmplIds.wx_tmpl_id_audit.id] = "wx_tmpl_id_audit"
+      subscribIds.push(this.tmplIds.wx_tmpl_id_car_audit.id)
+      subscribKeys[this.tmplIds.wx_tmpl_id_car_audit.id] = "wx_tmpl_id_car_audit"
+      subscribIds.push(this.tmplIds.wx_tmpl_id_unread.id)
+      subscribKeys[this.tmplIds.wx_tmpl_id_unread.id] = "wx_tmpl_id_unread"
+      //}
+      new Promise((resolve, reject) => {
+        wx.requestSubscribeMessage({
+          tmplIds: subscribIds,
+          success: (res) => {
+            if (_this.msgAfter) {
+              wepy.navigateTo({
+                url: url
+              })
+            }
+            let acceptKeys = []
+            subscribIds.forEach(tmplId => {
+              if (res[tmplId] === 'accept') {
+                acceptKeys.push(subscribKeys[tmplId])
+              }
+            })
+            resolve(acceptKeys)
+          },
+          fail(err) {
+            //失败            
+            console.error(err);
+            reject()
+            if (_this.msgAfter) {
+              wepy.navigateTo({
+                url: url
+              })
+            }
+          }
+        })
+      }).then(res => {
+        this.updateTmplIds(res)
+      });
+    }
+    async updateTmplIds(acceptKeys) {
+      let tmpKeyStr = ''
+      acceptKeys.forEach(key => {
+        tmpKeyStr = tmpKeyStr + key + ","
+      });
+      const data = await wxRequest.Get('updateTmplIds', {
+        tmplIds: tmpKeyStr
+      })
+      if (data.code >= 1) {}
+    }
+    async getBanner() {
+      const data = await wxRequest.Get('setting/getBanner')
+      this.bannerUrl = data.result
+      this.$apply()
+    }
+    async bingUser() {
+      let bean = {
+        op: 1,
+      }
+      let url = 'sys/bindUser'
+      let data = await wxRequest.Get(url, bean)
+      if (data != undefined && data.code >= 1) {
+        tip.error("登录成功！")
+        Session.set('refresh', true)
+        //绑定成功，转入到用户信息完善界面
+        wepy.navigateTo({
+          url: '/pages/user/bind_user_form'
+        })
+      } else {
+        tip.confirm(data.message, {}, '错误提示', false)
+      }
+    }
+    openAction() {
+      this.actions1 = [{
+        name: '正式使用需创建或加入组织'
+      }, {
+        name: '创建新组织',
+        icon: 'add',
+        size: 16
+      }, {
+        name: '加入现组织',
+        icon: 'flag',
+        size: 16
+      }]
+      if (this.user.isAgent) {
+        this.actions1.push({
+          name: '合伙人计划',
+          icon: 'group_fill',
+          size: 16
+        })
+      }
+      if (this.user.mobile == null || this.user.mobile == '' || this.user.mobile == undefined || this.user.mobile.substring(0, 3) == '100') {
+        this.actions1.push({
+          name: '完善信息',
+          icon: 'editor',
+          size: 16
+        })
+      }
+      this.visible1 = true
+    }
+    computed = {
+      showEmpty() {
+        return this.list.length <= 0
+      }
+    }
+  }
+</script>
+<style>
+  .form_button {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+  }
+  .form_button::after {
+    border: 0px;
+  }
+</style>
+<style lang="scss" src="@/public/styles/index.scss"/>

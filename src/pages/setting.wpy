@@ -1,0 +1,320 @@
+<template>
+  <view class="container">
+    <view class="header" :class="{'no-login': !user.isLogin}" style="height: 174px;">
+      <view class="main-container" style="margin:0">
+        <view class="user-section" @tap="redirect('/pages/settings/user_info')">
+          <view class="user">
+            <view>
+              <image src="{{ user.avatarUrl }}"></image>
+            </view>
+            <view class="user-info">
+              <view style="font-size: 16px">{{ user.name }}</view>
+              <view class="text-grey">{{ sayHello }}</view>
+            </view>
+          </view>
+          <view class="bonus">设置 ></view>
+        </view>
+        <view class="header-bottom">
+          <view @tap="developing()">
+            <view>
+              <image src="../public/images/003-pie-chart.png"></image>
+            </view>
+            <view>统计报表</view>
+          </view>
+          <view @tap="developing()">
+            <view>
+              <image src="../public/images/help_ic.png"></image>
+            </view>
+            <view>使用帮助</view>
+          </view>
+          <view @tap="redirect('/pages/settings/role_info')">
+            <view>
+              <image src="../public/images/user_role.png"></image>
+            </view>
+            <view>角色说明</view>
+          </view>
+          <view @tap="toAgentPage()">
+            <view>
+              <image src="../public/images/hand.png"></image>
+            </view>
+            <view>合伙人计划</view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="login-message" wx:if="{{ !user.isLogin }}">
+      <view>
+        <button class="get-user-btn" open-type="getUserInfo" bindgetuserinfo="getUserInfo">点击登录</button>
+        <view class="continue" style="font-size: 14px; margin-top: 6px">
+          登录后开启高效办公之旅
+        </view>
+      </view>
+    </view>
+    <view class="setting-container" style="padding-bottom: 26rpx;">
+      <i-cell-group>
+        <i-cell title="{{priceTitle}}" label="{{priceLabel}}" is-link url="{{priceUrl}}" value="{{expiryDate}}">
+        </i-cell>
+        <i-cell title="更换封面" is-link url="/pages/settings/header">
+        </i-cell>
+        <i-cell title="反馈与建议" is-link @tap="redirect('/pages/settings/feedback')">
+        </i-cell>
+        <i-cell title="关于铛铛办公" is-link url="/pages/settings/about" value="{{ version }}">
+        </i-cell>
+      </i-cell-group>
+    </view>
+    <official-account style=""></official-account>
+    <view class="recommend-container">
+      <button class="recommend-button" open-type="share">推荐给朋友使用</button>
+    </view>
+    <i-load-more i-class="bottom-text" tip="铛铛办公" loading="{{ false }}" />
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import Session from '@/utils/session'
+  export default class Setting extends wepy.page {
+    config = {
+      navigationBarTitleText: '我的',
+      "usingComponents": {
+        "i-cell-group": "../public/iview/cell-group/index",
+        "i-cell": "../public/iview/cell/index",
+        "i-load-more": "../public/iview/load-more/index",
+        "i-grid": "../public/iview/grid/index",
+        "i-grid-item": "../public/iview/grid-item/index",
+        "i-grid-icon": "../public/iview/grid-icon/index",
+        "i-grid-label": "../public/iview/grid-label/index",
+      }
+    }
+    data = {
+      tmplIds: {}, //需用户订阅的模版消息ID
+      system: '',
+      priceUrl: '',
+      user: {
+        name: '访客',
+        noRead: 0,
+        avatarUrl: '../public/images/no_login_avatar.png',
+        isLogin: true
+      },
+      version: '',
+      expiryDate: '',
+      priceLabel: '',
+      priceTitle: '服务到期时间',
+      showPrice: 'false',
+      isFree: 'false'
+    }
+    computed = {
+      sayHello() {
+        const now = new Date()
+        const hour = now.getHours()
+        if (hour < 6) {
+          return '凌晨好'
+        } else if (hour < 9) {
+          return '早上好'
+        } else if (hour < 12) {
+          return '上午好'
+        } else if (hour < 14) {
+          return '中午好'
+        } else if (hour < 17) {
+          return '下午好'
+        } else if (hour < 24) {
+          return '晚上好'
+        } else {
+          return '你好'
+        }
+      }
+    }
+    onLoad() {
+      wx.showShareMenu({
+        withShareTicket: true
+      });
+      this.system = Session.get('system')
+    }
+    onShow() {
+      this.getUser()
+    }
+    methods = {
+      redirect(url) {
+        this.subscribMsg()
+        wepy.navigateTo({
+          url: url
+        })
+      },
+      toPricePage() {
+        // if (this.showPrice == 'true') {
+        //   if (this.system.indexOf('iOS') > -1) {
+        //     tip.confirm('IOS暂不支持在线付费，如需付费购买，请联系客服处理，谢谢！', {}, '重要提示', false)
+        //   } else {
+        //     //  wepy.navigateTo({
+        //     //   url: "/pages/user/member_pay"
+        //     // })          
+        //   }
+        // } else {
+        // }
+      },
+      toAgentPage() {
+        if (this.user.isAgent) {
+          wepy.navigateTo({
+            url: "/pages/agent/index"
+          })
+        } else if (!this.user.isAgent && this.user.showAgent == "true") {
+          wepy.navigateTo({
+            url: "/pages/agent/welcome"
+          })
+        } else {
+          tip.confirm('如欲代理此产品，请与客服联系，谢谢！', {}, '提示', false)
+        }
+      },
+      cleanSession() {
+        wx.clearStorage()
+        tip.toast('清理成功')
+      },
+      async getUserInfo(e) {
+        if (e.detail.errMsg != 'getUserInfo:ok') return false
+        const userInfo = e.detail.userInfo
+        const data = await wxRequest.Get('wx-login', userInfo)
+        if (data.result.bind) {
+          this.getUser()
+          //通知Tab页面需要刷新
+          for (let index = 0; index < 5; index++) {
+            Session.set('page-' + index, true)
+          }
+          this.$apply()
+        } else {
+          //为绑定，转到绑定界面
+          wepy.navigateTo({
+            url: '/pages/user/bind_user_form'
+          })
+        }
+      },
+      developing() {
+        wx.showToast({
+          title: '开发中，敬请期待',
+          icon: 'none'
+        });
+      }
+    }
+    onShareAppMessage(ops) {
+      let url = '/pages/index'
+      if (this.user.isAgent) {
+        url = '/pages/index?fromUser=' + this.user.id
+      }
+      return {
+        title: '当前最好用的会议室预约、车辆预约系统，无需安装即点即用',
+        path: url,
+        imageUrl: 'https://yzimg.jikebang.com/oa/share/share.png',
+        success: async function(res) {
+          tip.toast('感谢支持')
+          // await wxRequest.Post('settings/recommend', {
+          //   ticket: res['shareTickets'][0]
+          // })
+        }
+      }
+    }
+    async getUser() {
+      this.loadByCache()
+      const data = await wxRequest.Get('settings')
+      if (data.result.user) {
+        Session.set('user_load_cache', data.result.user)
+        this.user = data.result.user
+        this.tmplIds = this.user.tmplIds
+        if (!this.user.isDemo) {
+          this.expiryDate = data.result.user.expiryDate + " 到期 "
+          if (data.result.user.memberExpiry) {
+            this.expiryDate = "服务已过期，请点击续费或联系客服"
+          }
+        } else {
+          this.expiryDate = ''
+        }
+        this.showPrice = this.user.showPrice
+        this.isFree = this.user.isFree
+        if (this.showPrice == 'true') {
+          if (this.system.indexOf('iOS') > -1) {
+            this.priceUrl = '/pages/settings/contact'
+            this.priceLabel = ''
+            this.priceTitle = '服务到期时间'
+          } else {
+            this.priceUrl = '/pages/user/member_pay'
+            this.priceLabel = ""
+            this.priceTitle = "续费升级"
+          }
+        } else {
+          this.priceUrl = '/pages/settings/contact'
+          this.priceLabel = ''
+          this.priceTitle = '服务到期时间'
+        }
+        if (this.isFree || (this.user.isDemo && this.user.isFreeVersion == "true")) {
+          this.priceUrl = ''
+          this.priceLabel = ''
+          this.priceTitle = '版本类型'
+          this.expiryDate = '全功能免费版'
+        }
+      }
+      this.version = data.result.version
+      this.$apply()
+    }
+    async subscribMsg() {
+      if (this.user.isDemo) {
+        return
+      }
+      let suggestAlerted = Session.get("suggestAlerted");
+      if (suggestAlerted !== "true") {
+        await tip.confirm('尊敬的客户，稍后的消息订阅框，请您务必点击允许，并选择【总是保持以上选择】，以使本软件更好为您服务，谢谢！', {}, '重要提示', false)
+        Session.set("suggestAlerted", "true");
+      }
+      if (this.tmplIds == null) {
+        return
+      }
+      let subscribIds = []
+      let subscribKeys = {}
+      subscribIds.push(this.tmplIds.wx_tmpl_id_suggest.id)
+      subscribKeys[this.tmplIds.wx_tmpl_id_suggest.id] = "wx_tmpl_id_suggest"
+      subscribIds.push(this.tmplIds.wx_tmpl_id_suggest_reply.id)
+      subscribKeys[this.tmplIds.wx_tmpl_id_suggest_reply.id] = "wx_tmpl_id_suggest_reply"
+      new Promise((resolve, reject) => {
+        wx.requestSubscribeMessage({
+          tmplIds: subscribIds,
+          success: (res) => {
+            let acceptKeys = []
+            subscribIds.forEach(tmplId => {
+              if (res[tmplId] === 'accept') {
+                acceptKeys.push(subscribKeys[tmplId])
+              }
+            })
+            resolve(acceptKeys)
+          },
+          fail(err) {
+            //失败
+            console.error(err);
+            reject()
+          }
+        })
+      }).then(res => {
+        this.updateTmplIds(res)
+      });
+    }
+    async updateTmplIds(acceptKeys) {
+      let tmpKeyStr = ''
+      acceptKeys.forEach(key => {
+        tmpKeyStr = tmpKeyStr + key + ","
+      });
+      const data = await wxRequest.Get('updateTmplIds', {
+        tmplIds: tmpKeyStr
+      })
+      if (data.code >= 1) {}
+    }
+    loadByCache() {
+      const cacheData = Session.get('user_load_cache')
+      if (cacheData) {
+        this.user = cacheData.user
+        this.version = cacheData.version
+        this.$apply()
+      }
+    }
+  }
+</script>
+<style lang="scss" src="../public/styles/setting.scss">
+
+</style>

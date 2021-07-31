@@ -1,0 +1,96 @@
+<template>
+  <view class="container">
+    <radio-group class="radio-group" bindchange="radioChange" style="display:flex">
+      <label class="radio" style="flex:1;text-align: center;" wx:for="{{items}}">
+                <radio value="{{item.value}}" checked="{{item.checked}}"/>{{item.name}}
+              </label>
+    </radio-group>
+    <view class="section" style="display:flex">
+      <textarea style="flex:1;padding:10rpx" placeholder="感谢您的反馈，我们将不断改进" bindinput="bindKeyRemark" value="{{ content }}" auto-focus maxlength="-1" />
+    </view>
+    <button class="zan-btn" style="margin: 18rpx 24rpx; background: #2196F3; color: white;" @tap="submit">提交</button>
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '../../utils/tip'
+  export default class Feedback extends wepy.page {
+    config = {
+      navigationBarTitleText: '反馈与建议'
+    }
+    data = {
+      content: '',
+      type: 5,
+      items: [
+        {
+          name: '程序错误',
+          value: '5',
+          checked: 'true'
+        },
+        {
+          name: '功能建议',
+          value: '2'
+        },
+        {
+          name: '咨询',
+          value: '1'
+        }
+      ]
+    }
+    methods = {
+      radioChange(e) {
+        this.type = e.detail.value
+      },
+      async submit() {
+        let data = await wxRequest.Get('tweet/pubMessage', {
+          content: this.content,
+          type: this.type
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          tip.error("感谢您的反馈！")
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      bindKeyRemark(e) {
+        this.content = e.detail.value
+      }
+    }
+  }
+</script>
+<style lang="less">
+  page {
+    background: #F4F4F4;
+  }
+  .radio-group {
+    margin: 28rpx 0;
+    padding: 0 24rpx;
+    >label {
+      width: 50%;
+      text-align: left;
+      display: inline-block;
+    }
+  }
+  .section {
+    padding: 0 24rpx;
+  }
+  .title {
+    font-size: 16px;
+    color: #999;
+  }
+  textarea {
+    width: 100%;
+    height: 230px;
+    border: 1px solid #ccc;
+    background: white;
+    font-size: 14px;
+  }
+</style>

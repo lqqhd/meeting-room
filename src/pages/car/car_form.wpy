@@ -1,0 +1,142 @@
+<template>
+  <view class="container">
+    <view class="grid">
+      <input hidden name="id" value="{{ entry.id }}" />
+      <i-input id="xh" value="{{ entry.xh }}" type="number" title="序号" placeholder="请填写序号" maxlength="11" bind:change="bindChange" right errorMessage="{{errMsgs.xhErrMsg}}" />
+      <i-input id="num" value="{{ entry.num }}" title="车牌号" placeholder="请填写车牌号" maxlength="64" bind:change="bindChange" right errorMessage="{{errMsgs.numErrMsg}}" />
+      <i-input id="name" value="{{ entry.name }}" title="车辆名称" placeholder="请填写车辆名称" maxlength="64" bind:change="bindChange" right errorMessage="{{errMsgs.nameErrMsg}}" />
+      <picker id="seatNum" bindchange="bindChange" value="{{entry.seatNum}}" range="{{seatNum_array}}">
+        <i-input value="{{ seatNum_array[entry.seatNum] }}人" title="准乘人数" placeholder="请选择准乘人数" disabled=true right rightIcon="enter" rightIconSize=18/>
+      </picker>
+      <i-cell title="状态">
+        <i-switch id="status" value="{{ entry.status }}" bind:change="bindSwitchChange" slot="footer"></i-switch>
+      </i-cell>
+      <picker id="nextCheckDate" mode="date" start="2019-01-01" bindchange="bindChange">
+        <i-input value="{{ entry.nextCheckDate }}" title="下一次年检日期" placeholder="请选择下一次年检日期" maxlength="0" bind:change="bindChange" disabled=true right rightIcon="activity" rightIconColor="#0095F2" errorMessage="{{errMsgs.nextCheckDateErrMsg}}" />
+      </picker>
+    </view>
+    <view class="btn-box">
+      <view class="biz-btn save" @tap="goBack" hidden="{{!assign}}">关闭</view>
+      <view class="biz-btn save" @tap="del">删除</view>
+      <view class="biz-btn save" @tap="submit">{{entry.id == 0 || entry.id == undefined?"提交":"修改"}}</view>
+    </view>
+    <i-message id="message" />
+  </view>
+</template>
+
+<script>
+  import wepy from 'wepy'
+  import wxRequest from '@/utils/wxRequest'
+  import tip from '@/utils/tip'
+  import dateUtil from '@/utils/date-util'
+  import Session from '@/utils/session'
+  import dateTimePicker from '@/utils/datepicker.js'
+  const {
+    $Message
+  } = require('@/public/iview/base/index')
+  export default class CarForm extends wepy.page {
+    config = {
+      navigationBarTitleText: '车辆管理',
+      usingComponents: {
+        'i-message': '../../public/iview/message/index',
+        "i-input": "../../public/iview/input/index",
+        "i-cell": "../../public/iview/cell/index",
+        "i-switch": "../../public/iview/switch/index"
+      }
+    }
+    data = {
+      entry: {},
+      checkRules: {
+        required: [
+          "num",
+          "name",
+        ]
+      },
+      errMsgs: {},
+      seatNum_array: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "21", "22", "23", "24", "25"],
+      audit: false, //是否是审核状态
+    }
+    methods = {
+      bindChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? e.detail.value : e.detail.detail.value)
+      },
+      bindSwitchChange(e) {
+        this.entry[e.currentTarget.id] = (e.detail.detail == undefined ? (e.detail.value ? 1 : 0) : (e.detail.detail.value ? 1 : 0))
+      },
+      bindDateChange(e) {
+        let dt = 'dt' + e.currentTarget.id.substring(0, 1).toUpperCase() + e.currentTarget.id.substring(1)
+        this[dt] = e.detail.value
+        this.entry[e.currentTarget.id] = dateTimePicker.getDateStr(e.detail.value, this[dt + 'Array'])
+      },
+      goBack(e) {
+        wepy.navigateBack({
+          delta: 1
+        })
+      },
+      async del() {
+        await tip.confirm('确认要删除此条数据吗?', {}, '提示')
+        const data = await wxRequest.Get(`daguanjia/removeCar`, {
+          carId: this.entry.id
+        })
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      },
+      async submit() {
+        //检查必填
+        let checked = true
+        for (var i = 0; i < this.checkRules.required.length; i++) {
+          let item = this.checkRules.required[i]
+          if (this.entry[item] == '' || this.entry[item] == undefined) {
+            this.errMsgs[item + 'ErrMsg'] = '本项为必填项';
+            checked = false;
+          }
+        }
+        if (!checked) {
+          this.$apply()
+          return
+        }
+        let bean = {}
+        for (let key in this.entry) {
+          bean[key] = this.entry[key]
+        }
+        bean.carId = this.entry.id
+        delete bean.user
+        let url = 'daguanjia/modifyCar'
+        if (this.entry.id == 0 || this.entry.id == undefined) {
+          url = 'daguanjia/addCar'
+        }
+        let data = await wxRequest.Get(url, bean)
+        if (data != undefined && data.code >= 1) {
+          if (data.message != undefined && data.message != '') {
+            tip.error(data.message)
+          }
+          Session.set('refresh', true)
+          wepy.navigateBack({
+            delta: 1
+          })
+        } else {
+          tip.error(data.message)
+        }
+      }
+    }
+    computed = {}
+    onLoad(options) {
+      if (options.id == undefined) {} else {
+        let entry = Session.get("car-for-modify")
+        Session.clear("car-for-modify")
+        this.entry = entry
+      }
+    }
+  }
+</script>
+
+<style lang="scss" src="@/public/styles/common_form.scss"/>

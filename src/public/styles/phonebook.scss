@@ -1,0 +1,80 @@
+@import './_variable.scss';
+.input-box {
+  background: #f4f4f4;
+  input {
+    background: white;
+    padding: 6px;
+  }
+}
+.result-tip {
+  font-size: 12px;
+  color: #212121;
+  padding-top: 20rpx;
+  padding-left: 34rpx;
+  padding-bottom: 15rpx;
+}
+.input-placeholder {
+  font-size: 14px;
+}
+.loading-icon {
+  display: flex;
+  justify-content: center;
+  margin: 12px;
+}
+.dept-title {
+  padding:16rpx 32rpx;
+  font-size:28rpx;
+  background: #f4f4f4;
+}
+.statement {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin:0 32rpx;
+  border-bottom: 2rpx solid $borderColor;
+  padding:16rpx 0;
+  color: $primaryText;
+  .information {
+    display: flex;
+    align-items: center;
+    flex: 1;
+  }
+  .icon {
+    margin-right: 16rpx;
+    display: flex;
+    align-items: center;
+    image {
+      width: 70rpx;
+      height: 70rpx;
+      border-radius: 5px;
+    }
+  }
+  .st-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width:100%;
+    > view {
+      margin-bottom: 4rpx;
+    }
+    .title {
+      font-size: 28rpx;
+    }
+    .description {
+      color: $secondaryText;
+      font-size: 24rpx;
+    }
+    .time {
+      color: $secondaryText;
+      font-size: 24rpx;
+    }
+  }
+  .transfer-icon {
+    margin-right: 16rpx;
+    display: flex;
+    align-items: center;
+    width: 70rpx;
+    height: 70rpx;
+    border-radius: 50%;
+  }
+}
